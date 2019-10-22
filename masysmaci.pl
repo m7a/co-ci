@@ -10,10 +10,12 @@ use Git::Wrapper; # libgit-wrapper-perl (?)
 
 use Data::Dumper 'Dumper'; # debug only
 
-my $root = abs_path(dirname($0)."/..");
+my $root  = abs_path(dirname($0)."/..");
+my $cidir = "masysma-ci"; # TODO z switch to new naming
+my $logdir = "cilogs";
 
 # Next features
-# [ ] Benennung vereinheitlichen für Konfiguration
+# [x] Benennung vereinheitlichen für Konfiguration
 # [ ] repo management (create, add, update, remove) is separate
 # [ ] run environments
 #     default: local command execution
@@ -203,46 +205,57 @@ my %triggers = (
 my $dom_parser = new XML::DOM::Parser;
 my %trigger_runenvs;
 my %known_repos;
+my %log_counters; # TODO NOT USED YET NEED TO DETERMINE VALUES JUST BEFORE PROCESSING THE OTHER THINGS...
+my @subprocesses; # TODO NOT USED YET. THIS IS INTENDED TO KEEP TRACK OF BG PROCESSES
 
 sub process_properties {
 	my ($entry, $doc) = @_;
 	my $proplst = $doc->getElementsByTagName("property");
+	my %prop_by_t; # property by target
+	# read all properties group by target
 	for(my $i = 0; $i < $proplst->getLength(); $i++) {
 		my $curi = $proplst->item($i);
 		my $name = $curi->getAttribute("name");
-		next unless ($name eq "masysma.ci.trigger" or $name eq "masysma.ci.runenv");
-
+		next if not $name =~ /^masysma\.ci\.(trigger|runenv)/;
 		my $target = $curi->getParentNode()->getAttribute("name");
-		my $value = $curi->getAttribute("value");
-		if($name eq "masysma.ci.trigger") {
-			my @trigger = split("=", $value, 2);
-			my $trigger_val = $#{trigger} eq 1? $trigger[1]: "";
-			if(defined($triggers{$trigger[0]})) {
-				$triggers{$trigger[0]}->{add}->($entry, $target,
-								$trigger_val);
+		$prop_by_t{$target} = {} if(!defined($prop_by_t{$target}));
+		$prop_by_t{$target}->{$name} = $curi->getAttribute("value");
+	}
+	# process by target
+	for my $target (keys %prop_by_t) {
+		if(defined($prop_by_t{$target}->{"masysma.ci.trigger"})) {
+			my $type = $prop_by_t{$target}->{"masysma.ci.trigger"};
+			if(defined($triggers{$type})) {
+				$triggers{$type}->{add}->(
+					$entry, $target,
+					defined($prop_by_t{$target}->{
+						"maysma.ci.trigger.param"})?
+						$prop_by_t{$target}->{
+						"masysma.ci.trigger.param"}: ""
+				);
 			} else {
-				print "[ERROR] Trigger type \"$trigger[0]\"".
+				print "[ERROR] Trigger type \"$type\"".
 							" not available.\n";
 			}
-		} elsif($name eq "masysma.ci.runenv") {
-			my @type = split(":", $value, 2);
-			my $runenv_val;
-			if($type[0] eq "ssh") {
-				$runenv_val = { type => "ssh",
-							conn => $type[1] };
-			} else {
-				print "[ERROR] Runenv $type[0] not ".
-							"implemented.\n";
-			}
+		}
+		if(defined($prop_by_t{$target}->{"masysma.ci.runenv"})) {
+			my $runenv_val = {
+				type => $prop_by_t{$target}->{
+						"masysma.ci.runenv"},
+				name => $prop_by_t{$target}->{
+						"masysma.ci.runenv.name"},
+				bg   => defined($prop_by_t{$target}->{
+						"masysma.ci.runenv.bg"})?
+						$prop_by_t{$target}->{
+						"masysma.ci.runenv.bg"}: 0,
+			};
 			if(!defined($trigger_runenvs{$entry})) {
 				$trigger_runenvs{$entry} = {$target
 								=> $runenv_val};
 			} else {
-				$trigger_runenvs{$target}{$target} =
+				$trigger_runenvs{$entry}{$target} =
 								$runenv_val;
 			}
-		} else {
-			print("[ERROR] Program bug.\n");
 		}
 	}
 }
@@ -274,8 +287,6 @@ while(1) {
 		#	process_properties($entry,
 		#		$dom_parser->parsefile($file)) if(-f $file);
 		#}
-
-		#$known_repos{$entry} = 1;
 	}
 	closedir($dir);
 	# handle repo deletions
@@ -298,23 +309,54 @@ while(1) {
 			my @ant_args = ("-buildfile", $root."/".$to_run->{repo},
 							$to_run->{target});
 
+			my %runenv;
 			if(defined($trigger_runenvs{$to_run->{repo}}{
 							$to_run->{target}})) {
-				# Need to run with specific runenv. TODO ASTAT
-				print("[ERROR] runenv execution not implemented. should run ssh -F here.");
+				
+				%runenv = %{$trigger_runenvs{$to_run->{repo}}{
+							$to_run->{target}}};
 			} else {
-				print("[INFO ] Running ant ".join(" ",
-							@ant_args)."\n");
-				system("ant", @ant_args) or 1;
+ 				%runenv = (
+					type       => "manual",
+					background => 0,
+				);
+			}
+
+			my $executable;
+			my @params;
+			if($runenv{type} eq "manual") {
+				$executable = "ant";
+				@params = @ant_args;
+			} elsif($runenv{type} eq "ssh") {
+				$executable = "ssh";
+				@params = ("-F",
+					"$root/$cidir/dot_ssh_server/config",
+					$runenv{name});
+				push(@params, @ant_args);
+			} else {
+				print("[WARNI] Should call runenv \"$runenv{type}\" but this type is not implemented!\n"); # TODO SUPPORT SOME ansible here. Note that we might send some parameters to ansible that are defined in the original XML... but the current system should be flexible enough to simply add this funcitonality.
+				next;
+			}
+
+			if($runenv{background}) {
+				print("[ERROR] BACKGROUND PROCESS NOT IMPLEMENTED ASTAT SEE SOURCE CODE\n");
+				# create a background process
+				# TODO CSTAT FOR FILE NAME DETERMINATION NEED TO SCAN DIRECTORY FIRST TO FIND OUT CURRENT COUNTER VALUES...
+				#my $proc = Proc::Simple->new();
+				#$proc->redirect_output(
+			} else {
+				# run directly
+				print("[INFO ] Running $executable ".join(" ",
+								@params)."\n");
+				system($executable, @params) or 1;
 				if($? == 0) {
-					print("[INFO ] ant completed ".
+					print("[INFO ] subprocess completed ".
 							"successfully.\n");
 				} else {
-					print("[WARNI] Failed to invoke ant: ".
-								$?."\n");
+					print("[WARNI] Failed to invoke ".
+							"subprocess: ".$?."\n");
 				}
 			}
-			# $to_run->{repo}, $to_run->{target}
 		}
 	}
 	sleep 5;
