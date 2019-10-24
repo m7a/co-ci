@@ -28,16 +28,17 @@ RUN     :; \
 			libproc-simple-perl \
 			gcc g++ gnat; \
 	:
+# "UsePrivilegeSeparation no" seems to be deprecated? Will it work w/o this
+# option?
 RUN     :; \
 	mkdir /home/mdvlci/sshd; \
 	cp /etc/ssh/ssh_host_ed25519_key /home/mdvlci/sshd; \
-	printf "%s\n%s\n%s\n" \
-		"UsePrivilegeSeparation no" \
+	printf "%s\n%s\n" \
 		"Port 2222" \
 		"HostKey /home/mdvlci/sshd/ssh_host_ed25519_key" \
 		> /home/mdvlci/sshd/sshd_config; \
 	chown -R mdvlci:mdvlci /home/mdvlci; \
-	chown 600 /home/mdvlci/sshd/*; \
+	chmod 600 /home/mdvlci/sshd/*; \
 	:
 USER mdvlci
-CMD ["/usr/bin/sshd", "-f", "/home/mdvlci/sshd/sshd_config", "-D"]
+CMD ["/usr/sbin/sshd", "-f", "/home/mdvlci/sshd/sshd_config", "-D"]

@@ -1,13 +1,16 @@
 version: "2"
 services:
     i386:
-        image: i368/masysmaci
+        image: i386/masysmaci:latest
         build:
             context: .
             dockerfile: dockerfile_masysmaci
             args:
                 - MDVL_CI_ARCH_PREFIX=i386/
-                - MA_DEBIAN_MIRROR=$MA_DEBIAN_MIRROR
-        volume:
-            - ./dot_ssh_server:/home/masysmaci/.ssh:ro
+                - MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
+        volumes:
+            - ./dot_ssh_i386:/home/masysmaci/.ssh:ro
             - ../:/home/masysmaci/root
+        # debug only
+        ports:
+            - 127.0.0.1:2222:2222

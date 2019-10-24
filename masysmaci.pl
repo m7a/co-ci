@@ -315,22 +315,22 @@ while(1) {
 	# -- Check background process status --
 	my $proccount = 0;
 	my $procevent = 0;
-	while(($logid, $process) = each (%subprocesses)) {
+	while(my ($logid, $process) = each (%subprocesses)) {
 		if(!$process->poll()) {
 			$procevent = 1;
-			if($proc->exit_status eq 0) {
+			if($process->exit_status eq 0) {
 				print("[INFO ] Background process ".$logid.
 						" finished successfully.\n");
 			} else {
 				print("[WARNI] Background process ".$logid.
 						" finished with error code ".
-						$proc->exit_status."\n");
+						$process->exit_status."\n");
 			}
 			delete $subprocesses{$logid};
 		}
 		$proccount++;
 	}
-	print("[INFO ] Currently running $proccount background processes.\n"
+	print("[INFO ] Currently running $proccount background processes.\n")
 					if($proccount and not $procevent);
 
 	# -- Run Commands as per change listeners --
@@ -368,7 +368,7 @@ while(1) {
 				$executable = "ssh";
 				@params = ("-F",
 					"$root/$cidir/dot_ssh_server/config",
-					$runenv{name});
+					$runenv{name}, "ant");
 				push(@params, @ant_args);
 			} else {
 				print("[WARNI] Should call runenv \"$runenv{type}\" but this type is not implemented!\n"); # TODO SUPPORT SOME ansible here. Note that we might send some parameters to ansible that are defined in the original XML... but the current system should be flexible enough to simply add this funcitonality.
