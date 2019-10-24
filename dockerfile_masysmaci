@@ -1,0 +1,43 @@
+ARG MDVL_CI_ARCH_PREFIX=
+ARG MDVL_CI_DEBIAN_VERSION=buster
+FROM ${MDVL_CI_ARCH_PREFIX}debian:$MDVL_CI_DEBIAN_VERSION
+ARG MDVL_CI_DEBIAN_VERSION=buster
+LABEL maintainer "Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>"
+LABEL name masysmaci
+# docker build -t masysmaci -f dockerfile_masysmaci .
+# docker build -t i386/masysmaci -f dockerfile_masysmaci --build-arg=MDVL_CI_ARCH_PREFIX=i386/ .
+ARG MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
+SHELL ["/bin/sh", "-ec"]
+# TODO z currently these are three layers for faster debugging.
+#        Once the container works as expected, replace by just one.
+RUN     :; \
+	printf "%s\n%s\n%s %s\n" \
+		"deb $MA_DEBIAN_MIRROR $MDVL_CI_DEBIAN_VERSION main" \
+		"deb $MA_DEBIAN_MIRROR $MDVL_CI_DEBIAN_VERSION-updates main" \
+		"deb http://security.debian.org/" \
+					"$MDVL_CI_DEBIAN_VERSION/updates main" \
+		> /etc/apt/sources.list; \
+	useradd -u 1000 -m mdvlci; \
+	apt-get update; \
+	apt-get -y dist-upgrade; \
+	:
+RUN     :; \
+	apt-get -y install openssh-server \
+			ant ant-optional libxz-java openjdk-11-jdk \
+			libxml-dom-perl libgit-wrapper-perl \
+			libproc-simple-perl \
+			gcc g++ gnat; \
+	:
+RUN     :; \
+	mkdir /home/mdvlci/sshd; \
+	cp /etc/ssh/ssh_host_ed25519_key /home/mdvlci/sshd; \
+	printf "%s\n%s\n%s\n" \
+		"UsePrivilegeSeparation no" \
+		"Port 2222" \
+		"HostKey /home/mdvlci/sshd/ssh_host_ed25519_key" \
+		> /home/mdvlci/sshd/sshd_config; \
+	chown -R mdvlci:mdvlci /home/mdvlci; \
+	chown 600 /home/mdvlci/sshd/*; \
+	:
+USER mdvlci
+CMD ["/usr/bin/sshd", "-f", "/home/mdvlci/sshd/sshd_config", "-D"]

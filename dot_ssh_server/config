@@ -1,3 +1,5 @@
+StrictHostKeyChecking accept-new
+
 Host i386
 	HostName	i386
 	IdentityFile	./id_ed25519_i386

@@ -7,6 +7,7 @@ use File::Basename;
 use Cwd qw(abs_path);
 use XML::DOM; # libxml-dom-perl
 use Git::Wrapper; # libgit-wrapper-perl (?)
+use Proc::Simple; # libproc-simple-perl
 
 use Data::Dumper 'Dumper'; # debug only
 
@@ -17,7 +18,7 @@ my $logdir = "cilogs";
 # Next features
 # [x] Benennung vereinheitlichen für Konfiguration
 # [ ] repo management (create, add, update, remove) is separate
-# [ ] run environments
+# [ ] run environments [CSTAT test the existing functionality / add i386 ssh container]
 #     default: local command execution
 #     option:  ssh command execution (configure ssh data in config XML)
 #     <runenv name="" type="ssh" host="..." port="..." user="">ID_RSA</runenv>
@@ -203,10 +204,23 @@ my %triggers = (
 ################################################################################
 
 my $dom_parser = new XML::DOM::Parser;
-my %trigger_runenvs;
-my %known_repos;
-my %log_counters; # TODO NOT USED YET NEED TO DETERMINE VALUES JUST BEFORE PROCESSING THE OTHER THINGS...
-my @subprocesses; # TODO NOT USED YET. THIS IS INTENDED TO KEEP TRACK OF BG PROCESSES
+my %trigger_runenvs = ();
+my %known_repos = ();
+
+# logging and subprocess management. these structures are indexed by
+# repository.target (because repositories are not deleted from this map even
+# if they are no longer on disk, they might be re-added and in this case old
+# logfiles should not be overwritten).
+my %log_counters = (); # index repository.target        -> integer
+my %subprocesses = (); # index repository.target.number -> Process::Simple
+mkdir "$root/$logdir" if(not -d "$root/$logdir");
+while(<"$root/$logdir/*.txt">) {
+	# format is repository.target.number.txt
+	my @fns = split(/\./);
+	my $key = $fns[0].".".$fns[1];
+	$log_counters{$key} = $fns[2] if(!defined($log_counters{$key}) or
+						$fns[2] gt $log_counters{$key});
+}
 
 sub process_properties {
 	my ($entry, $doc) = @_;
@@ -263,6 +277,7 @@ sub process_properties {
 while(1) {
 	printf "[INFO ] checking for changes...\n";
 
+	# -- Update repository information --
 	# For now, all XML files are parsed each round and the add functions
 	# of the triggers are called every time again. This is to allow changes
 	# to the files to be detected and processed. On the downside, it
@@ -279,8 +294,8 @@ while(1) {
 		my $doc = $dom_parser->parsefile("$root/$entry/build.xml");
 		process_properties($entry, $doc);
 
-		# Idea for one-level import. It turned out it won't be
-		# needed for now.
+		# Idea for one-level import processing.
+		# It turned out it is not needed for now.
 		#my $imports = $doc->getElementsByTagName("import");
 		#for(my $i = 0; $i < $imports->getLength(); $i++) {
 		#	my $file = $imports->item($i)->getAttribute("file");
@@ -297,6 +312,28 @@ while(1) {
 	}
 	@known_repos{keys %this_round} = 1;
 
+	# -- Check background process status --
+	my $proccount = 0;
+	my $procevent = 0;
+	while(($logid, $process) = each (%subprocesses)) {
+		if(!$process->poll()) {
+			$procevent = 1;
+			if($proc->exit_status eq 0) {
+				print("[INFO ] Background process ".$logid.
+						" finished successfully.\n");
+			} else {
+				print("[WARNI] Background process ".$logid.
+						" finished with error code ".
+						$proc->exit_status."\n");
+			}
+			delete $subprocesses{$logid};
+		}
+		$proccount++;
+	}
+	print("[INFO ] Currently running $proccount background processes.\n"
+					if($proccount and not $procevent);
+
+	# -- Run Commands as per change listeners --
 	my %run_this_round;
 	for my $trt (keys %triggers) {
 		my @changed = $triggers{$trt}->{determine_changed}->();
@@ -338,16 +375,22 @@ while(1) {
 				next;
 			}
 
+			my $printexe = "$executable ".join(" ", @params);
 			if($runenv{background}) {
-				print("[ERROR] BACKGROUND PROCESS NOT IMPLEMENTED ASTAT SEE SOURCE CODE\n");
-				# create a background process
-				# TODO CSTAT FOR FILE NAME DETERMINATION NEED TO SCAN DIRECTORY FIRST TO FIND OUT CURRENT COUNTER VALUES...
-				#my $proc = Proc::Simple->new();
-				#$proc->redirect_output(
+				my $logidx = (defined($log_counters{$runkey}))?
+						$log_counters{$runkey} + 1: 1;
+				$log_counters{$runkey} = $logidx;
+				my $logid = $runkey.".".$logidx;
+				my $logf = "$root/$logdir/$logid.txt";
+				my $proc = Proc::Simple->new();
+				$proc->redirect_output($logf);
+				$proc->start($executable, @params);
+				$subprocesses{$logid} = $proc;
+				print("[INFO ] Running in background: ".
+							$printexe."...\n");
 			} else {
 				# run directly
-				print("[INFO ] Running $executable ".join(" ",
-								@params)."\n");
+				print("[INFO ] Running $printexe...\n");
 				system($executable, @params) or 1;
 				if($? == 0) {
 					print("[INFO ] subprocess completed ".
