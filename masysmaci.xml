@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<masysmaci>
+	<runenv_ssh>
+		<property name="StrictHostKeyChecking" value="accept-new"/>
+		<!--
+			disable query for password upon failure
+			https://serverfault.com/questions/61915
+		-->
+		<property name="BatchMode" value="yes"/>
+		<host name="i386" phoenixroot="/home/masysmaci/root">
+			<!-- i386 -->
+			<property name="HostName" value="127.0.0.1"/>
+			<property name="Port" value="2222"/>
+			<property name="IdentityFile" value="$MDVL_CI_PHOENIX_ROOT/masysma-ci/dot_ssh_server/id_ed25519_i386"/>
+			<property name="User" value="masysmaci"/>
+		</host>
+	</runenv_ssh>
+</masysmaci>

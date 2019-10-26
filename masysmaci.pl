@@ -191,7 +191,7 @@ my %triggers = (
 		remove            => \&trigger_topleveladded_remove,
 		determine_changed => \&trigger_topleveladded_determine_changed,
 	},
-	# TODO z it seems for now we do not even need cron. ASTAT: The next thing should either be the working env declaration definiton+processing (stored in known_repos table?) and or the next thing could also be the package synchronization implementation including repo creation if absent.
+	# TODO z it seems for now we do not even need cron.
 	cron => {
 		add               => \&trigger_empty_add,
 		remove            => \&trigger_empty_remove,
@@ -207,6 +207,13 @@ my $dom_parser = new XML::DOM::Parser;
 my %trigger_runenvs = ();
 my %known_repos = ();
 
+# ssh options for each ssh runenv.
+my %ssh_runenvs = (
+	_all => {}
+);
+
+# -- logging and subprocesses --
+
 # logging and subprocess management. these structures are indexed by
 # repository.target (because repositories are not deleted from this map even
 # if they are no longer on disk, they might be re-added and in this case old
@@ -221,6 +228,62 @@ while(<"$root/$logdir/*.txt">) {
 	$log_counters{$key} = $fns[2] if(!defined($log_counters{$key}) or
 						$fns[2] gt $log_counters{$key});
 }
+
+# -- ssh options --
+# param 1: property element
+# param 2: optional attribute to read
+sub masysmaci_xml_value {
+	my $attr = $#_ > 0? $_[1]: "value";
+	my $strval = $_[0]->getAttribute($attr);
+	# better solutions (which do not fail on ';' in root path) are welcome!
+	$strval =~ s;\$MDVL_CI_PHOENIX_ROOT;$root;g;
+	return $strval;
+}
+sub proc_masysmaci_xml {
+	if(not -f $_[0]) {
+		print("[WARNI] File $_[0] does not exist. Not processed.\n");
+		return;
+	}
+	my $doc = $dom_parser->parsefile($_[0]);
+	my $rssh = $doc->getElementsByTagName("runenv_ssh");
+	for(my $i = 0; $i < $rssh->getLength; $i++) {
+		next unless $rssh->item($i)->getNodeType() eq ELEMENT_NODE;
+		for my $sub ($rssh->item($i)->getChildNodes()) {
+			next unless $sub->getNodeType() eq ELEMENT_NODE;
+			if($sub->getTagName() eq "property") {
+				# top-level property
+				$ssh_runenvs{_all}->{$sub->getAttribute("name")}
+						= masysmaci_xml_value($sub);
+			} elsif($sub->getTagName() eq "host") {
+				# host-specific
+				my $curr = $sub->getAttribute("name");
+				$ssh_runenvs{$curr} = { _phoenixroot =>
+					$sub->getAttribute("phoenixroot") };
+				my $subl = $sub->getElementsByTagName(
+								"property");
+				for(my $j = 0; $j < $subl->getLength(); $j++) {
+					my $el = $subl->item($j);
+					$ssh_runenvs{$curr}->{
+						$el->getAttribute("name")} =
+						masysmaci_xml_value($el);
+				}
+			} else {
+				# other
+				print("[WARNI] $_[0]: Unknown element: ".
+						$sub->getTagName()."\n");
+			}
+		}
+	}
+	my $incl = $doc->getElementsByTagName("include");
+	for(my $i = 0; $i < $incl->getLength; $i++) {
+		proc_masysmaci_xml(masysmaci_xml_value($incl->item($i),
+								"file"));
+	}
+}
+
+proc_masysmaci_xml("$root/$cidir/masysmaci.xml");
+
+# -- mainloop --
 
 sub process_properties {
 	my ($entry, $doc) = @_;
@@ -343,35 +406,43 @@ while(1) {
 			next if(defined($run_this_round{$runkey}));
 			$run_this_round{$runkey} = 1;
 
-			my @ant_args = ("-buildfile", $root."/".$to_run->{repo},
-							$to_run->{target});
-
-			my %runenv;
-			if(defined($trigger_runenvs{$to_run->{repo}}{
-							$to_run->{target}})) {
-				
-				%runenv = %{$trigger_runenvs{$to_run->{repo}}{
-							$to_run->{target}}};
-			} else {
- 				%runenv = (
-					type       => "manual",
-					background => 0,
-				);
-			}
+			my %runenv = defined($trigger_runenvs{$to_run->{repo}}{
+							$to_run->{target}})?
+				%{$trigger_runenvs{$to_run->{repo}}{
+							$to_run->{target}}}:
+ 				( type => "manual", background => 0, );
 
 			my $executable;
 			my @params;
 			if($runenv{type} eq "manual") {
 				$executable = "ant";
-				@params = @ant_args;
+				@params = (
+					"-buildfile",
+					$root."/".$to_run->{repo}."/build.xml",
+					$to_run->{target}
+				);
 			} elsif($runenv{type} eq "ssh") {
 				$executable = "ssh";
-				@params = ("-F",
-					"$root/$cidir/dot_ssh_server/config",
-					$runenv{name}, "ant");
-				push(@params, @ant_args);
+				my %ssh_opts;
+				@ssh_opts{keys %{$ssh_runenvs{_all}}} =
+						values %{$ssh_runenvs{_all}};
+				my %rekv = %{$ssh_runenvs{$runenv{name}}};
+				my $remote_root = $rekv{_phoenixroot};
+				my $connstr = $rekv{User}."@".$rekv{HostName};
+				delete $rekv{User};
+				delete $rekv{HostName};
+				delete $rekv{_phoenixroot};
+				@ssh_opts{keys %rekv} = values %rekv;
+				@params = map { ("-o", "$_=$ssh_opts{$_}") }
+								keys %ssh_opts;
+				push(@params, $connstr);
+				push(@params, "ant");
+				push(@params, "-buildfile");
+				push(@params, $remote_root."/".$to_run->{repo}.
+								"/build.xml");
+				push(@params, $to_run->{target});
 			} else {
-				print("[WARNI] Should call runenv \"$runenv{type}\" but this type is not implemented!\n"); # TODO SUPPORT SOME ansible here. Note that we might send some parameters to ansible that are defined in the original XML... but the current system should be flexible enough to simply add this funcitonality.
+				print("[WARNI] Should call runenv \"$runenv{type}\" but this type is not implemented!\n"); # TODO z Support Ansible here. Note that we might send some parameters to ansible that are defined in the original XML... but the current system should be flexible enough to simply add this functionality.
 				next;
 			}
 

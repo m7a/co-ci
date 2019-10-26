@@ -17,7 +17,7 @@ RUN     :; \
 		"deb http://security.debian.org/" \
 					"$MDVL_CI_DEBIAN_VERSION/updates main" \
 		> /etc/apt/sources.list; \
-	useradd -u 1000 -m mdvlci; \
+	useradd -u 1000 -m masysmaci; \
 	apt-get update; \
 	apt-get -y dist-upgrade; \
 	:
@@ -26,19 +26,17 @@ RUN     :; \
 			ant ant-optional libxz-java openjdk-11-jdk \
 			libxml-dom-perl libgit-wrapper-perl \
 			libproc-simple-perl \
-			gcc g++ gnat; \
+			gcc g++ gnat devscripts; \
 	:
-# "UsePrivilegeSeparation no" seems to be deprecated? Will it work w/o this
-# option?
 RUN     :; \
-	mkdir /home/mdvlci/sshd; \
-	cp /etc/ssh/ssh_host_ed25519_key /home/mdvlci/sshd; \
+	mkdir /home/masysmaci/sshd; \
+	cp /etc/ssh/ssh_host_ed25519_key /home/masysmaci/sshd; \
 	printf "%s\n%s\n" \
 		"Port 2222" \
-		"HostKey /home/mdvlci/sshd/ssh_host_ed25519_key" \
-		> /home/mdvlci/sshd/sshd_config; \
-	chown -R mdvlci:mdvlci /home/mdvlci; \
-	chmod 600 /home/mdvlci/sshd/*; \
+		"HostKey /home/masysmaci/sshd/ssh_host_ed25519_key" \
+		> /home/masysmaci/sshd/sshd_config; \
+	chown -R masysmaci:masysmaci /home/masysmaci; \
+	chmod 600 /home/masysmaci/sshd/*; \
 	:
-USER mdvlci
-CMD ["/usr/sbin/sshd", "-f", "/home/mdvlci/sshd/sshd_config", "-D"]
+USER masysmaci
+CMD ["/usr/sbin/sshd", "-f", "/home/masysmaci/sshd/sshd_config", "-D"]
