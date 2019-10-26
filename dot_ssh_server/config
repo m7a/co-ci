@@ -1,8 +1,0 @@
-StrictHostKeyChecking accept-new
-
-Host i386
-	HostName	127.0.0.1
-	#HostName	i386
-	Port		2222
-	IdentityFile	$MDVL_CI_PHOENIX_ROOT/masysma-ci/dot_ssh_server/id_ed25519_i386
-	User		masysmaci

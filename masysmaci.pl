@@ -8,6 +8,7 @@ use Cwd qw(abs_path);
 use XML::DOM; # libxml-dom-perl
 use Git::Wrapper; # libgit-wrapper-perl (?)
 use Proc::Simple; # libproc-simple-perl
+# use Dancer2; # libdancer2-perl # seems not to work this way? fork subprocess to regularly call an endpoint seems strange?
 
 use Data::Dumper 'Dumper'; # debug only
 
@@ -15,36 +16,7 @@ my $root  = abs_path(dirname($0)."/..");
 my $cidir = "masysma-ci"; # TODO z switch to new naming
 my $logdir = "cilogs";
 
-# Next features
-# [x] Benennung vereinheitlichen für Konfiguration
-# [ ] repo management (create, add, update, remove) is separate
-# [ ] run environments [CSTAT test the existing functionality / add i386 ssh container]
-#     default: local command execution
-#     option:  ssh command execution (configure ssh data in config XML)
-#     <runenv name="" type="ssh" host="..." port="..." user="">ID_RSA</runenv>
-#     <runenv name="" type="ansible" 
-#     such an xml version is possibly not the best, because how do we spearate
-#     an i386 public ssh runenv from our private server management?
-#     later option: ansible execution (provide some ansible files + configure them separately)
-#     also the thing about background tasks and non-background tasks?
-#     A solid solution could be the use of a directory which contains
-#     files corresponding to the execution env names. Then the masysmaci
-#     would search a directory in its own directory (predefined tasks)
-#     but also allow searching an additional private conf directory)
-#     -> ASEL. Then how is SSH config described. Possibly best "not at all", i.e.
-#     by SSH ~/.ssh/config itself. For docker running, it should be simply
-#     possible to supply the .ssh directory; then again: this does not allow
-#     for apropriate separation :(
-#     but: multiple ssh configs can be concatenated (will require absolute paths?).
-#     Additionally, it is possible to transfer any config file to a longish
-#     set of commandline args. ssh config can do includes so stop worrying :)
-#     Angabe von run-env: <property key="masysma.ci.runenv" value="ssh:i386"/>
-#     <gar nichts>, ssh:name, ansible:name. We are still missing a way to
-#     indicate direct vs. background processes? Could define a separate
-#     property for the purpose?
-# [ ] manaual triggering
-#     should still honor configured execution type. thus not only scan by
-#     trigger but also by non-default run env
+# TODO manual triggering via API endpoint?
 
 ################################################################################
 ## TRIGGER CODE ################################################################
@@ -79,7 +51,7 @@ sub trigger_newver_add {
 				$trigger_newver{$_[0]}->{target} eq $_[1]);
 	# for now assume there is just one target to be triggered on version
 	# changes (otherwise there would not be a defined order and chaos
-	# emerges?)
+	# emerges?) TODO CSTAT THIS ASSUMPTION IS INSUFFICIENT FOR NEW i386+amd64 builds!
 	$trigger_newver{$_[0]} = {target => $_[1],
 				version => trigger_newver_get_version($_[0])};
 }
@@ -165,7 +137,7 @@ sub trigger_topleveladded_determine_changed {
 			while(my ($repo, $conf) =
 					each %trigger_topleveladded_triggers) {
 				my $plen = length($conf->{pattern});
-				if(($plen le length($file)) and
+				if(($plen <= length($file)) and
 						($conf->{pattern} eq
 						substr($file, -$plen))) {
 					$rvtrigger{$repo.".".$conf->{target}
@@ -283,6 +255,12 @@ sub proc_masysmaci_xml {
 
 proc_masysmaci_xml("$root/$cidir/masysmaci.xml");
 
+# -- REST interface --
+
+#set host => $conf{adress};
+#set port => $conf{port};
+#start;
+
 # -- mainloop --
 
 sub process_properties {
@@ -306,7 +284,7 @@ sub process_properties {
 				$triggers{$type}->{add}->(
 					$entry, $target,
 					defined($prop_by_t{$target}->{
-						"maysma.ci.trigger.param"})?
+						"masysma.ci.trigger.param"})?
 						$prop_by_t{$target}->{
 						"masysma.ci.trigger.param"}: ""
 				);
@@ -410,11 +388,11 @@ while(1) {
 							$to_run->{target}})?
 				%{$trigger_runenvs{$to_run->{repo}}{
 							$to_run->{target}}}:
- 				( type => "manual", background => 0, );
+ 				( type => "local", background => 0, );
 
 			my $executable;
 			my @params;
-			if($runenv{type} eq "manual") {
+			if($runenv{type} eq "local") {
 				$executable = "ant";
 				@params = (
 					"-buildfile",
