@@ -13,8 +13,8 @@ use Proc::Simple; # libproc-simple-perl
 use Data::Dumper 'Dumper'; # debug only
 
 my $root  = abs_path(dirname($0)."/..");
-my $cidir = "masysma-ci"; # TODO z switch to new naming
-my $logdir = "cilogs";
+my $cidir = "cp-ci"; # TODO z switch to new naming
+my $logdir = "x-cp-ci-logs";
 
 # TODO manual triggering via API endpoint?
 
@@ -48,12 +48,9 @@ sub trigger_newver_add {
 	# skip add if already present because we will not detect the change
 	# if we update it here...
 	return if(defined($trigger_newver{$_[0]}) and
-				$trigger_newver{$_[0]}->{target} eq $_[1]);
-	# for now assume there is just one target to be triggered on version
-	# changes (otherwise there would not be a defined order and chaos
-	# emerges?) TODO CSTAT THIS ASSUMPTION IS INSUFFICIENT FOR NEW i386+amd64 builds!
-	$trigger_newver{$_[0]} = {target => $_[1],
-				version => trigger_newver_get_version($_[0])};
+				defined($trigger_newver{$_[0]}->{$_[1]}));
+	$trigger_newver{$_[0]} = {} if(!defined($trigger_newver{$_[0]}));
+	$trigger_newver{$_[0]}->{$_[1]} = trigger_newver_get_version($_[0]);
 }
 
 # $1 reponame
@@ -66,13 +63,16 @@ sub trigger_newver_determine_changed {
 	my @retlist = ();
 	for my $repo (keys %trigger_newver) {
 		my $newver = trigger_newver_get_version($repo);
-		if($newver ne 0 and $newver ne
-					$trigger_newver{$repo}->{version}) {
-			push @retlist, {
-				repo   => $repo,
-				target => $trigger_newver{$repo}->{target}
-			};
-			$trigger_newver{$repo}->{version} = $newver;
+		if($newver ne 0) {
+			for my $target (keys %{$trigger_newver{$repo}}) {
+				if($newver ne $trigger_newver{$repo
+								}->{$target}) {
+					push @retlist, {repo   => $repo,
+							target => $target};
+					$trigger_newver{$repo}->{$target} =
+								$newver;
+				}
+			}
 		}
 	}
 	return @retlist;
