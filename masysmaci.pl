@@ -13,8 +13,8 @@ use Proc::Simple; # libproc-simple-perl
 use Data::Dumper 'Dumper'; # debug only
 
 my $root  = abs_path(dirname($0)."/..");
-my $cidir = "cp-ci"; # TODO z switch to new naming
-my $logdir = "x-cp-ci-logs";
+my $cidir = "co-ci"; # TODO z switch to new naming
+my $logdir = "x-co-ci-logs";
 
 # TODO manual triggering via API endpoint?
 
