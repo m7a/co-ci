@@ -251,6 +251,7 @@ sub proc_masysmaci_xml {
 		proc_masysmaci_xml(masysmaci_xml_value($incl->item($i),
 								"file"));
 	}
+	$doc->dispose();
 }
 
 proc_masysmaci_xml("$root/$cidir/masysmaci.xml");
@@ -334,6 +335,7 @@ while(1) {
 		
 		my $doc = $dom_parser->parsefile("$root/$entry/build.xml");
 		process_properties($entry, $doc);
+		$doc->dispose();
 
 		# Idea for one-level import processing.
 		# It turned out it is not needed for now.
