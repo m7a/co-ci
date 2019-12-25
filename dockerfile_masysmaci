@@ -25,7 +25,7 @@ RUN     :; \
 	apt-get -y install openssh-server \
 			ant ant-optional libxz-java openjdk-11-jdk \
 			libxml-dom-perl libgit-wrapper-perl \
-			libproc-simple-perl \
+			libproc-simple-perl config-package-dev \
 			gcc g++ gnat devscripts; \
 	:
 RUN     :; \
