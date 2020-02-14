@@ -123,6 +123,7 @@ sub trigger_topleveladded_determine_changed {
 		next unless (-f "$root/$entry");
 		$thisround{$entry} = 1;
 	}
+	closedir($dir);
 	for my $file (keys %trigger_topleveladded_files) {
 		# has been deleted
 		if(!defined($thisround{$file})) {
