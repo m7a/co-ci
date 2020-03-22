@@ -1,4 +1,7 @@
 #!/usr/bin/perl
+# Ma_Sys.ma CI 1.0.0, Copyright (c) 2019, 2020 Ma_Sys.ma.
+# For further info send an e-mail to Ma_Sys.ma@web.de.
+
 use strict;
 use warnings FATAL => 'all';
 use autodie;
@@ -8,18 +11,51 @@ use threads::shared;
 use Try::Tiny;
 use File::Basename;
 use Cwd qw(abs_path);
-use XML::DOM;          # libxml-dom-perl
-use Git::Wrapper;      # libgit-wrapper-perl
-use Proc::Simple;      # libproc-simple-perl
-require Thread::Queue; # (perl-modules-5.24)
-use Dancer2;           # libdancer2-perl
+use XML::DOM;            # libxml-dom-perl
+use Git::Wrapper;        # libgit-wrapper-perl
+use Proc::Simple;        # libproc-simple-perl
+require Thread::Queue;   # (perl-modules-5.24)
+require Term::ANSIColor;
+use Dancer2;             # libdancer2-perl
 
-use Data::Dumper 'Dumper'; # debug only
+# use Data::Dumper 'Dumper'; # debug only
 
 # -- constants -----------------------------------------------------------------
-my $root  = abs_path(dirname($0)."/..");
-my $cidir = "co-ci";
+my $root   = abs_path(dirname($0)."/..");
+my $cidir  = "co-ci";
 my $logdir = "x-co-ci-logs";
+
+# Dancer2 constant configuration
+set content_type => "text/plain";
+set charset      => "UTF-8";
+
+################################################################################
+## LOGGING #####################################################################
+################################################################################
+
+# Now it seems a little strange that one would need to write one's own but that
+# is it as far as I can see...
+
+binmode STDOUT, ":utf8"; # otherwise gives weird error...
+
+# $_[0] color
+# $_[1] message
+sub log_line {
+	my ($sec, $min, $hour, $day, $mon, $year, $_wday, $_yday, $_isdst) =
+								localtime(time);
+	$year += 1900;
+	print Term::ANSIColor::color($_[0]) if($^O ne "MSWin32");
+	chomp $_[1];
+	printf("%04d/%02d/%02d %02d:%02d:%02d %s",
+				$year, $mon, $day, $hour, $min, $sec, $_[1]);
+	print Term::ANSIColor::color("reset") if($^O ne "MSWin32");
+	print "\n";
+}
+
+sub log_debug   { log_line("blue",        "[ DEBUG ] ".$_[0]); }
+sub log_info    { log_line("white" ,      "[MESSAGE] ".$_[0]); }
+sub log_warning { log_line("bold yellow", "[WARNING] ".$_[0]); }
+sub log_error   { log_line("bold red",    "[ ERROR ] ".$_[0]); }
 
 ################################################################################
 ## TRIGGER CODE ################################################################
@@ -28,12 +64,11 @@ my $logdir = "x-co-ci-logs";
 # -- default/debug emtpy trigger -----------------------------------------------
 
 sub trigger_empty_add {
-	print "[DEBUG] TRIGGER + N_IMPL reponame=$_[0], target=$_[1], ".
-								"val=$_[2]\n";
+	log_debug("TRIGGER + N_IMPL reponame=$_[0], target=$_[1], val=$_[2]");
 }
 
 sub trigger_empty_remove {
-	print "[DEBUG] TRIGGER - N_IMPL reponame=$_[0]\n";
+	log_debug("TRIGGER - N_IMPL reponame=$_[0]");
 }
 
 sub trigger_empty_determine_changed {
@@ -207,7 +242,7 @@ sub masysmaci_xml_value {
 }
 sub proc_masysmaci_xml {
 	if(not -f $_[0]) {
-		print("[WARNI] File $_[0] does not exist. Not processed.\n");
+		log_warning("File $_[0] does not exist. Not processed.");
 		return;
 	}
 	my $doc = $dom_parser->parsefile($_[0]);
@@ -235,8 +270,8 @@ sub proc_masysmaci_xml {
 				}
 			} else {
 				# other
-				print("[WARNI] $_[0]: Unknown element: ".
-						$sub->getTagName()."\n");
+				log_warning("$_[0]: Unknown element: ".
+							$sub->getTagName());
 			}
 		}
 	}
@@ -289,18 +324,18 @@ sub check_background_process_status {
 		if(!$process->poll()) {
 			$procevent = 1;
 			if($process->exit_status eq 0) {
-				print("[INFO ] Background process ".$logid.
-						" finished successfully.\n");
+				log_info("Background process ".$logid.
+						" finished successfully.");
 			} else {
-				print("[WARNI] Background process ".$logid.
+				log_warning("Background process ".$logid.
 						" finished with error code ".
-						$process->exit_status."\n");
+						$process->exit_status);
 			}
 			delete $subprocesses{$logid};
 		}
 		$proccount++;
 	}
-	print("[INFO ] Currently running $proccount background processes.\n")
+	log_info("Currently running $proccount background processes.")
 					if($proccount and not $procevent);
 }
 
@@ -356,9 +391,9 @@ my $thread_build = threads->create(sub {
 				# XML... but the current system should be
 				# flexible enough to simply add this
 				# functionality.
-				print("[WARNI] Should call runenv ".
-					"\"$runenv{type}\" but this type is ".
-					"not implemented!\n");
+				log_warning("Should call runenv ".
+						"\"$runenv{type}\" but this ".
+						"type is not implemented!");
 				next;
 			}
 
@@ -374,17 +409,16 @@ my $thread_build = threads->create(sub {
 			
 			if($runenv{bg}) {
 				$subprocesses{$logid} = $proc;
-				print("[INFO ] Running in background: ".
-							$printexe."...\n");
+				log_info("Running in background: $printexe...");
 			} else {
-				print("[INFO ] Running $printexe...\n");
+				log_info("Running $printexe...");
 				my $haveln = 0;
 				while($proc->poll()) {
 					open my $file, '<:encoding(UTF-8)',
 									$logf;
 					my $curln = 0;
 					while(my $line = <$file>) {
-						print $line
+						log_info("| $line")
 							if($curln >= $haveln);
 						$curln++;
 						last if not $proc->poll();
@@ -394,15 +428,15 @@ my $thread_build = threads->create(sub {
 				}
 				my $rv = $proc->exit_status();
 				if($rv == 0) {
-					print("[INFO ] subprocess completed ".
-							"successfully.\n");
+					log_info("subprocess completed ".
+							"successfully.");
 				} else {
-					print("[WARNI] Failed to invoke ".
-							"subprocess: $rv\n");
+					log_warning("Failed to invoke ".
+							"subprocess: $rv");
 				}
 			}
 		} else {
-			print("[ERROR] Unknown query type $query->{type}.\n"); 
+			log_error("Unknown query type $query->{type}.");
 		}	
 	}
 });
@@ -437,8 +471,8 @@ sub process_properties {
 						"masysma.ci.trigger.param"}: ""
 				);
 			} else {
-				print "[ERROR] Trigger type \"$type\"".
-							" not available.\n";
+				log_error("Trigger type \"$type\" ".
+							"is not available.");
 			}
 		}
 		my %runenv_val :shared;
@@ -474,7 +508,7 @@ sub process_properties {
 }
 
 sub check_for_changes {
-	printf "[INFO ] checking for changes...\n";
+	log_info("Checking for changes...");
 
 	# -- Update repository information --
 	# For now, all XML files are parsed each round and the add functions
@@ -493,8 +527,8 @@ sub check_for_changes {
 		my $doc = try {
 			return $dom_parser->parsefile("$root/$entry/build.xml");
 		} catch {
-			print "[WARNI] XML parse failure for ".
-				"$root/$entry/build.xml: $_ skipping...\n";
+			log_warning("XML parse failure for ".
+				"$root/$entry/build.xml: $_ skipping...");
 			return 0;
 		};
 		next if($doc eq 0);
@@ -566,14 +600,14 @@ my $thread_background_timer = threads->create(sub {
 
 $SIG{INT} = sub {
 	# leading \n to fix mis-indented line with the ^C on it...
-	print "\n[INFO ] Termination signal received.\n";
+	print "\n-- Termination signal received --\n";
 	$queue_build->enqueue({type => "TERM"});
 	$thread_background_timer->kill("SIGTERM");
-	print "[INFO ] Join background timer thread...\n";
+	log_info("Join background timer thread...");
 	$thread_background_timer->join();
-	print "[INFO ] Join build thread...\n";
+	log_info("Join build thread...");
 	$thread_build->join();
-	print "[INFO ] Finished.\n";
+	log_info("Finished.");
 	exit(0);
 };
 $SIG{TERM} = $SIG{INT};
@@ -582,10 +616,8 @@ $SIG{TERM} = $SIG{INT};
 ## REST INTERFACE ##############################################################
 ################################################################################
 
-set host         => $conf{address};
-set port         => $conf{port};
-set content_type => "text/plain";
-set charset      => "UTF-8";
+set host => $conf{address};
+set port => $conf{port};
 
 get "/" => sub {
 	return "/build\n/term\n";
@@ -637,8 +669,14 @@ post "/build/:repository" => sub {
 
 post "/build/:repository/:target" => sub {
 	# means trigger one
-	enqueue_to_run({repo => route_parameters->get("repository"),
-				target => route_parameters->get("target")});
+	my $repository = route_parameters->get("repository");
+	my $target = route_parameters->get("target");
+	if(defined($trigger_runenvs{$repository}{$target})) {
+		enqueue_to_run({repo => $repository, target => $target});
+	} else {
+		send_error "Repository/Target combination does not exist. ".
+							"Not found.", 404;
+	}
 };
 
 start;
