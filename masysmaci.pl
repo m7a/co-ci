@@ -2,33 +2,34 @@
 use strict;
 use warnings FATAL => 'all';
 use autodie;
+use threads;
+use threads::shared;
 
 use Try::Tiny;
 use File::Basename;
 use Cwd qw(abs_path);
-use XML::DOM; # libxml-dom-perl
-use Git::Wrapper; # libgit-wrapper-perl (?)
-use Proc::Simple; # libproc-simple-perl
-# use Dancer2; # libdancer2-perl # seems not to work this way? fork subprocess to regularly call an endpoint seems strange?
+use XML::DOM;          # libxml-dom-perl
+use Git::Wrapper;      # libgit-wrapper-perl
+use Proc::Simple;      # libproc-simple-perl
+require Thread::Queue; # (perl-modules-5.24)
+use Dancer2;           # libdancer2-perl
 
 use Data::Dumper 'Dumper'; # debug only
 
+# -- constants -----------------------------------------------------------------
 my $root  = abs_path(dirname($0)."/..");
-my $cidir = "co-ci"; # TODO z switch to new naming
+my $cidir = "co-ci";
 my $logdir = "x-co-ci-logs";
-
-# TODO manual triggering via API endpoint?
 
 ################################################################################
 ## TRIGGER CODE ################################################################
 ################################################################################
 
-# TODO z once it works, one can externalize this in a modular fashion
-
 # -- default/debug emtpy trigger -----------------------------------------------
 
 sub trigger_empty_add {
-	print "[DEBUG] TRIGGER + N_IMPL reponame=$_[0], target=$_[1], val=$_[2]\n";
+	print "[DEBUG] TRIGGER + N_IMPL reponame=$_[0], target=$_[1], ".
+								"val=$_[2]\n";
 }
 
 sub trigger_empty_remove {
@@ -154,6 +155,7 @@ sub trigger_topleveladded_determine_changed {
 	return values %rvtrigger;
 }
 
+# check for changes
 my %triggers = (
 	newver => {
 		add               => \&trigger_newver_add,
@@ -165,7 +167,7 @@ my %triggers = (
 		remove            => \&trigger_topleveladded_remove,
 		determine_changed => \&trigger_topleveladded_determine_changed,
 	},
-	# TODO z it seems for now we do not even need cron.
+	# does not seem to be needed as of now...
 	cron => {
 		add               => \&trigger_empty_add,
 		remove            => \&trigger_empty_remove,
@@ -174,36 +176,26 @@ my %triggers = (
 );
 
 ################################################################################
-## MAIN CI CODE ################################################################
+## INITIALIZATION ##############################################################
 ################################################################################
 
-my $dom_parser = new XML::DOM::Parser;
-my %trigger_runenvs = ();
-my %known_repos = ();
+my $dom_parser      = new XML::DOM::Parser; # check for changes
+my %trigger_runenvs :shared;                # check for changes, REST r/o
+my %known_repos     :shared;                # check for changes, REST r/o
+my $queue_build     = Thread::Queue->new(); # check for changes, REST
 
-# ssh options for each ssh runenv.
+# ssh options for each ssh runenv.            check for changes
 my %ssh_runenvs = (
 	_all => {}
 );
 
-# -- logging and subprocesses --
+# used for webserver
+my %conf = (
+	address => "127.0.0.1",
+	port    => 9030,
+);
 
-# logging and subprocess management. these structures are indexed by
-# repository.target (because repositories are not deleted from this map even
-# if they are no longer on disk, they might be re-added and in this case old
-# logfiles should not be overwritten).
-my %log_counters = (); # index repository.target        -> integer
-my %subprocesses = (); # index repository.target.number -> Process::Simple
-mkdir "$root/$logdir" if(not -d "$root/$logdir");
-while(<"$root/$logdir/*.txt">) {
-	# format is repository.target.number.txt
-	my @fns = split(/\./);
-	my $key = $fns[0].".".$fns[1];
-	$log_counters{$key} = $fns[2] if(!defined($log_counters{$key}) or
-						$fns[2] gt $log_counters{$key});
-}
-
-# -- ssh options --
+# -- ssh options ---------------------------------------------------------------
 # param 1: property element
 # param 2: optional attribute to read
 sub masysmaci_xml_value {
@@ -248,6 +240,15 @@ sub proc_masysmaci_xml {
 			}
 		}
 	}
+	my $confel = $doc->getElementsByTagName("conf");
+	for(my $i = 0; $i < $confel->getLength; $i++) {
+		for my $sub ($confel->item($i)->getChildNodes()) {
+			next unless $sub->getNodeType() eq ELEMENT_NODE and
+					$sub->getTagName() eq "property";
+			$conf{$sub->getAttribute("name")} =
+						$confel->getAttribute("value");
+		}
+	}
 	my $incl = $doc->getElementsByTagName("include");
 	for(my $i = 0; $i < $incl->getLength; $i++) {
 		proc_masysmaci_xml(masysmaci_xml_value($incl->item($i),
@@ -255,16 +256,160 @@ sub proc_masysmaci_xml {
 	}
 	$doc->dispose();
 }
-
 proc_masysmaci_xml("$root/$cidir/masysmaci.xml");
 
-# -- REST interface --
+################################################################################
+## BACKGROUND THREAD: DEQUEUE AND BUILD ########################################
+################################################################################
 
-#set host => $conf{adress};
-#set port => $conf{port};
-#start;
+# -- logging and subprocesses --
+# logging and subprocess management. these structures are indexed by
+# repository.target (because repositories are not deleted from this map even
+# if they are no longer on disk, they might be re-added and in this case old
+# logfiles should not be overwritten).
+my %log_counters = (); # index repository.target        -> integer
+my %subprocesses = (); # index repository.target.number -> Process::Simple
 
-# -- mainloop --
+share(%log_counters);  # also needed r/o by log printing from server
+
+mkdir "$root/$logdir" if(not -d "$root/$logdir");
+
+while(<"$root/$logdir/*.txt">) {
+	# format is repository.target.number.txt
+	my @fns = split(/\./, basename($_));
+	my $key = $fns[0].".".$fns[1];
+	$log_counters{$key} = $fns[2] if(!defined($log_counters{$key}) or
+						$fns[2] gt $log_counters{$key});
+}
+
+sub check_background_process_status {
+	my $proccount = 0;
+	my $procevent = 0;
+	while(my ($logid, $process) = each (%subprocesses)) {
+		if(!$process->poll()) {
+			$procevent = 1;
+			if($process->exit_status eq 0) {
+				print("[INFO ] Background process ".$logid.
+						" finished successfully.\n");
+			} else {
+				print("[WARNI] Background process ".$logid.
+						" finished with error code ".
+						$process->exit_status."\n");
+			}
+			delete $subprocesses{$logid};
+		}
+		$proccount++;
+	}
+	print("[INFO ] Currently running $proccount background processes.\n")
+					if($proccount and not $procevent);
+}
+
+my $thread_build = threads->create(sub {
+	while(1) {
+		# {type => "TERM"}
+		# {type => "CHECK_BACKGROUND_PROCESS_STATUS"}
+		# {type => "RUN", runenv => $runenv, to_run => $to_run}
+		my $query = $queue_build->dequeue();
+
+		last if($query->{type} eq "TERM"); # poison-pill termination
+
+		if($query->{type} eq "CHECK_BACKGROUND_PROCESS_STATUS") {
+			check_background_process_status();
+		} elsif($query->{type} eq "RUN") {
+			my %runenv = %{$query->{runenv}};
+			my $to_run = $query->{to_run};
+			my $runkey = $to_run->{repo}.".".$to_run->{target};
+			
+			my $executable;
+			my @params;
+			if($runenv{type} eq "local") {
+				$executable = "ant";
+				@params = (
+					"-buildfile",
+					$root."/".$to_run->{repo}."/build.xml",
+					$to_run->{target}
+				);
+			} elsif($runenv{type} eq "ssh") {
+				$executable = "ssh";
+				my %ssh_opts;
+				@ssh_opts{keys %{$ssh_runenvs{_all}}} =
+						values %{$ssh_runenvs{_all}};
+				my %rekv = %{$ssh_runenvs{$runenv{name}}};
+				my $remote_root = $rekv{_phoenixroot};
+				my $connstr = $rekv{User}."@".$rekv{HostName};
+				delete $rekv{User};
+				delete $rekv{HostName};
+				delete $rekv{_phoenixroot};
+				@ssh_opts{keys %rekv} = values %rekv;
+				@params = map { ("-o", "$_=$ssh_opts{$_}") }
+								keys %ssh_opts;
+				push(@params, $connstr);
+				push(@params, "ant");
+				push(@params, "-buildfile");
+				push(@params, $remote_root."/".$to_run->{repo}.
+								"/build.xml");
+				push(@params, $to_run->{target});
+			} else {
+				# TODO z Might want to add support for Ansible
+				# here. Note that we might send some parameters
+				# to Ansible that are defined in the original
+				# XML... but the current system should be
+				# flexible enough to simply add this
+				# functionality.
+				print("[WARNI] Should call runenv ".
+					"\"$runenv{type}\" but this type is ".
+					"not implemented!\n");
+				next;
+			}
+
+			my $printexe = $executable." ".join(" ", @params);
+			my $logidx = (defined($log_counters{$runkey}))?
+						$log_counters{$runkey} + 1: 1;
+			$log_counters{$runkey} = $logidx;
+			my $logid = $runkey.".".$logidx;
+			my $logf = "$root/$logdir/$logid.txt";
+			my $proc = Proc::Simple->new();
+			$proc->redirect_output($logf, $logf);
+			$proc->start($executable, @params);
+			
+			if($runenv{bg}) {
+				$subprocesses{$logid} = $proc;
+				print("[INFO ] Running in background: ".
+							$printexe."...\n");
+			} else {
+				print("[INFO ] Running $printexe...\n");
+				my $haveln = 0;
+				while($proc->poll()) {
+					open my $file, '<:encoding(UTF-8)',
+									$logf;
+					my $curln = 0;
+					while(my $line = <$file>) {
+						print $line
+							if($curln >= $haveln);
+						$curln++;
+						last if not $proc->poll();
+					}
+					$haveln = $curln;
+					close $file;
+				}
+				my $rv = $proc->exit_status();
+				if($rv == 0) {
+					print("[INFO ] subprocess completed ".
+							"successfully.\n");
+				} else {
+					print("[WARNI] Failed to invoke ".
+							"subprocess: $rv\n");
+				}
+			}
+		} else {
+			print("[ERROR] Unknown query type $query->{type}.\n"); 
+		}	
+	}
+});
+
+################################################################################
+## BACKGROUND THREAD TIMER CHECK FOR CHANGES ###################################
+################################################################################
 
 sub process_properties {
 	my ($entry, $doc) = @_;
@@ -296,8 +441,9 @@ sub process_properties {
 							" not available.\n";
 			}
 		}
+		my %runenv_val :shared;
 		if(defined($prop_by_t{$target}->{"masysma.ci.runenv"})) {
-			my $runenv_val = {
+			%runenv_val = (
 				type => $prop_by_t{$target}->{
 						"masysma.ci.runenv"},
 				name => $prop_by_t{$target}->{
@@ -306,19 +452,28 @@ sub process_properties {
 						"masysma.ci.runenv.bg"})?
 						$prop_by_t{$target}->{
 						"masysma.ci.runenv.bg"}: 0,
-			};
-			if(!defined($trigger_runenvs{$entry})) {
-				$trigger_runenvs{$entry} = {$target
-								=> $runenv_val};
-			} else {
-				$trigger_runenvs{$entry}{$target} =
-								$runenv_val;
-			}
+			);
+		} else {
+			# Design: We need to store this to be able to later
+			# retrieve the list of targets. Otherwise and previously
+			# it was enough to only save the runenv_val for those
+			# items which were not local / bg=0
+			%runenv_val = (type => "local", bg => 0);
+		}
+		
+		lock(%trigger_runenvs);
+		if(!defined($trigger_runenvs{$entry})) {
+			my %assoc :shared;
+			$assoc{$target} = \%runenv_val;
+			$trigger_runenvs{$entry} = \%assoc;
+		} else {
+			$trigger_runenvs{$entry}{$target} =
+						\%runenv_val;
 		}
 	}
 }
 
-while(1) {
+sub check_for_changes {
 	printf "[INFO ] checking for changes...\n";
 
 	# -- Update repository information --
@@ -364,104 +519,126 @@ while(1) {
 		}
 	}
 	@known_repos{keys %this_round} = 1;
-
-	# -- Check background process status --
-	my $proccount = 0;
-	my $procevent = 0;
-	while(my ($logid, $process) = each (%subprocesses)) {
-		if(!$process->poll()) {
-			$procevent = 1;
-			if($process->exit_status eq 0) {
-				print("[INFO ] Background process ".$logid.
-						" finished successfully.\n");
-			} else {
-				print("[WARNI] Background process ".$logid.
-						" finished with error code ".
-						$process->exit_status."\n");
-			}
-			delete $subprocesses{$logid};
-		}
-		$proccount++;
-	}
-	print("[INFO ] Currently running $proccount background processes.\n")
-					if($proccount and not $procevent);
-
-	# -- Run Commands as per change listeners --
-	my %run_this_round;
-	for my $trt (keys %triggers) {
-		my @changed = $triggers{$trt}->{determine_changed}->();
-
-		for my $to_run (@changed) {
-			my $runkey = $to_run->{repo}.".".$to_run->{target};
-			next if(defined($run_this_round{$runkey}));
-			$run_this_round{$runkey} = 1;
-
-			my %runenv = defined($trigger_runenvs{$to_run->{repo}}{
-							$to_run->{target}})?
-				%{$trigger_runenvs{$to_run->{repo}}{
-							$to_run->{target}}}:
- 				( type => "local", background => 0, );
-
-			my $executable;
-			my @params;
-			if($runenv{type} eq "local") {
-				$executable = "ant";
-				@params = (
-					"-buildfile",
-					$root."/".$to_run->{repo}."/build.xml",
-					$to_run->{target}
-				);
-			} elsif($runenv{type} eq "ssh") {
-				$executable = "ssh";
-				my %ssh_opts;
-				@ssh_opts{keys %{$ssh_runenvs{_all}}} =
-						values %{$ssh_runenvs{_all}};
-				my %rekv = %{$ssh_runenvs{$runenv{name}}};
-				my $remote_root = $rekv{_phoenixroot};
-				my $connstr = $rekv{User}."@".$rekv{HostName};
-				delete $rekv{User};
-				delete $rekv{HostName};
-				delete $rekv{_phoenixroot};
-				@ssh_opts{keys %rekv} = values %rekv;
-				@params = map { ("-o", "$_=$ssh_opts{$_}") }
-								keys %ssh_opts;
-				push(@params, $connstr);
-				push(@params, "ant");
-				push(@params, "-buildfile");
-				push(@params, $remote_root."/".$to_run->{repo}.
-								"/build.xml");
-				push(@params, $to_run->{target});
-			} else {
-				print("[WARNI] Should call runenv \"$runenv{type}\" but this type is not implemented!\n"); # TODO z Support Ansible here. Note that we might send some parameters to ansible that are defined in the original XML... but the current system should be flexible enough to simply add this functionality.
-				next;
-			}
-
-			my $printexe = "$executable ".join(" ", @params);
-			if($runenv{background}) {
-				my $logidx = (defined($log_counters{$runkey}))?
-						$log_counters{$runkey} + 1: 1;
-				$log_counters{$runkey} = $logidx;
-				my $logid = $runkey.".".$logidx;
-				my $logf = "$root/$logdir/$logid.txt";
-				my $proc = Proc::Simple->new();
-				$proc->redirect_output($logf);
-				$proc->start($executable, @params);
-				$subprocesses{$logid} = $proc;
-				print("[INFO ] Running in background: ".
-							$printexe."...\n");
-			} else {
-				# run directly
-				print("[INFO ] Running $printexe...\n");
-				system($executable, @params) or 1;
-				if($? == 0) {
-					print("[INFO ] subprocess completed ".
-							"successfully.\n");
-				} else {
-					print("[WARNI] Failed to invoke ".
-							"subprocess: ".$?."\n");
-				}
-			}
-		}
-	}
-	sleep 5;
 }
+
+# $_[0]: to run
+sub enqueue_to_run {
+	my $to_run = shift;
+	# This separate variable $hash is needed because of $trigger_runenv
+	# being shared...
+	my $hash   = $trigger_runenvs{$to_run->{repo}};
+	my $runenv = $hash->{$to_run->{target}};
+	$queue_build->enqueue({type => "RUN", runenv => $runenv,
+							to_run => $to_run});
+}
+
+my $thread_background_timer = threads->create(sub {
+	my $is_interrupted = 0;
+	$SIG{INT} = sub { $is_interrupted = 1; };
+	$SIG{TERM} = $SIG{INT};
+	while(not $is_interrupted) {
+		check_for_changes();
+
+		$queue_build->enqueue({type =>
+					"CHECK_BACKGROUND_PROCESS_STATUS"});
+
+		my %run_this_round;
+		for my $trt (keys %triggers) {
+			my @changed = $triggers{$trt}->{determine_changed}->();
+			for my $to_run (@changed) {
+				my $runkey = $to_run->{repo}.".".
+							$to_run->{target};
+				next if(defined($run_this_round{$runkey}));
+				$run_this_round{$runkey} = 1;
+
+				enqueue_to_run($to_run);
+			}
+		}
+		for(my $i = 0; $i < 5 and not $is_interrupted; $i++) {
+			sleep(1);
+		}
+	}
+});
+
+################################################################################
+## SIGNAL HANDLING #############################################################
+################################################################################
+
+$SIG{INT} = sub {
+	# leading \n to fix mis-indented line with the ^C on it...
+	print "\n[INFO ] Termination signal received.\n";
+	$queue_build->enqueue({type => "TERM"});
+	$thread_background_timer->kill("SIGTERM");
+	print "[INFO ] Join background timer thread...\n";
+	$thread_background_timer->join();
+	print "[INFO ] Join build thread...\n";
+	$thread_build->join();
+	print "[INFO ] Finished.\n";
+	exit(0);
+};
+$SIG{TERM} = $SIG{INT};
+
+################################################################################
+## REST INTERFACE ##############################################################
+################################################################################
+
+set host         => $conf{address};
+set port         => $conf{port};
+set content_type => "text/plain";
+set charset      => "UTF-8";
+
+get "/" => sub {
+	return "/build\n/term\n";
+};
+
+get "/build" => sub {
+	return join("", map { "/build/$_\n" } keys %known_repos);
+};
+
+get "/build/:repository" => sub {
+	my $repository = route_parameters->get("repository");
+	my $runenv = $trigger_runenvs{$repository};
+	return join("", map { "/build/$repository/$_\n" } keys %{$runenv});
+};
+
+get "/build/:repository/:target" => sub {
+	my $runkey = route_parameters->get("repository").".".
+						route_parameters->get("target");
+	if($runkey =~ /^[a-z0-9_.-]+$/) {
+		if(defined($log_counters{$runkey})) {
+			my $logf = "$root/$logdir/$runkey".
+						".$log_counters{$runkey}.txt";
+			my $cntbuf = "";
+			open my $file, '<:encoding(UTF-8)', $logf;
+			while(my $line = <$file>) {
+				$cntbuf .= $line;
+			}
+			close $file;
+			return $cntbuf;
+		} else {
+			send_error "No build logs found.", 404;
+		}
+	} else {
+		send_error "Misformatted input. Not found.", 404;
+	}
+};
+
+post "/term" => sub {
+	$SIG{INT}->();
+};
+
+post "/build/:repository" => sub {
+	# means trigger all
+	my $repository = route_parameters->get("repository");
+	for my $target (keys %{$trigger_runenvs{$repository}}) {
+		enqueue_to_run({repo => $repository, target => $target});
+	}
+};
+
+post "/build/:repository/:target" => sub {
+	# means trigger one
+	enqueue_to_run({repo => route_parameters->get("repository"),
+				target => route_parameters->get("target")});
+};
+
+start;
