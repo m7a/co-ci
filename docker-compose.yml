@@ -1,5 +1,17 @@
 version: "2"
 services:
+    amd64:
+        image: masysmaci:latest
+        build:
+            context: .
+            dockerfile: dockerfile_masysmaci
+            args:
+                - MA_DEBIAN_MIRROR=http://192.168.1.16/debian
+        volumes:
+            - ../:/home/masysmaci/root
+            - /data/programs/repo:/data/programs/repo
+        command:
+            - /home/masysmaci/root/co-ci/masysmaci.pl
     i386:
         image: i386/masysmaci:latest
         build:
@@ -7,10 +19,24 @@ services:
             dockerfile: dockerfile_masysmaci
             args:
                 - MDVL_CI_ARCH_PREFIX=i386/
-                - MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
+                - MA_DEBIAN_MIRROR=http://192.168.1.16/debian
         volumes:
             - ./dot_ssh_i386:/home/masysmaci/.ssh:ro
             - ../:/home/masysmaci/root
         # debug only
         ports:
             - 127.0.0.1:2222:2222
+    armhf:
+        image: arm32v7/masysmaci:latest
+        build:
+            context: .
+            dockerfile: dockerfile_masysmaci
+            args:
+                - MDVL_CI_ARCH_PREFIX=arm32v7/
+                - MA_DEBIAN_MIRROR=http://192.168.1.16/debian
+        volumes:
+            - ./dot_ssh_armhf:/home/masysmaci/.ssh:ro
+            - ../:/home/masysmaci/root
+        # debug only
+        ports:
+            - 127.0.0.1:2223:2222

@@ -9,10 +9,15 @@
 		-->
 		<property name="BatchMode" value="yes"/>
 		<host name="i386" phoenixroot="/home/masysmaci/root">
-			<!-- i386 -->
-			<property name="HostName" value="127.0.0.1"/>
+			<property name="HostName" value="i386"/>
 			<property name="Port" value="2222"/>
-			<property name="IdentityFile" value="$MDVL_CI_PHOENIX_ROOT/cp-ci/dot_ssh_server/id_ed25519_i386"/>
+			<property name="IdentityFile" value="$MDVL_CI_PHOENIX_ROOT/co-ci/dot_ssh_server/id_ed25519_i386"/>
+			<property name="User" value="masysmaci"/>
+		</host>
+		<host name="armhf" phoenixroot="/home/masysmaci/root">
+			<property name="HostName" value="armhf"/>
+			<property name="Port" value="2222"/>
+			<property name="IdentityFile" value="$MDVL_CI_PHOENIX_ROOT/co-ci/dot_ssh_server/id_ed25519_armhf"/>
 			<property name="User" value="masysmaci"/>
 		</host>
 	</runenv_ssh>

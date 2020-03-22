@@ -3,6 +3,7 @@ use strict;
 use warnings FATAL => 'all';
 use autodie;
 
+use Try::Tiny;
 use File::Basename;
 use Cwd qw(abs_path);
 use XML::DOM; # libxml-dom-perl
@@ -333,8 +334,16 @@ while(1) {
 						-f "$root/$entry/build.xml");
 		$this_round{$entry} = 1;
 		#next if $known_repos{$entry};
-		
-		my $doc = $dom_parser->parsefile("$root/$entry/build.xml");
+
+		my $doc = try {
+			return $dom_parser->parsefile("$root/$entry/build.xml");
+		} catch {
+			print "[WARNI] XML parse failure for ".
+				"$root/$entry/build.xml: $_ skipping...\n";
+			return 0;
+		};
+		next if($doc eq 0);
+
 		process_properties($entry, $doc);
 		$doc->dispose();
 
