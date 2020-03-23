@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <masysmaci>
+	<conf>
+		<property name="address" value="0.0.0.0"/>
+		<property name="port"    value="9030"/>
+	</conf>
 	<runenv_ssh>
 		<property name="StrictHostKeyChecking" value="accept-new"/>
 		<!--

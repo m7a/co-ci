@@ -1,3 +1,10 @@
+# Ma_Sys.ma CI 1.0.0, Copyright (c) 2019, 2020 Ma_Sys.ma.
+# For further info send an e-mail to Ma_Sys.ma@web.de.
+#
+# This file defines a container for building MDVL packages. It is prepared to
+# run Ma_Sys.ma CI tasks. It provides a user "masysmaci" with ID 1000 and
+# has common Ma_Sys.ma build dependencies installed.
+
 # docker build -t masysmaci -f dockerfile_masysmaci .
 # docker build -t i386/masysmaci -f dockerfile_masysmaci --build-arg=MDVL_CI_ARCH_PREFIX=i386/ .
 # docker build -t armhf/masysmaci -f dockerfile_masysmaci --build=arg=MDVL_CI_ARCH_PREFIX=armhf/ .
@@ -28,9 +35,12 @@ LABEL name masysmaci
 ARG MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
 SHELL ["/bin/sh", "-ec"]
 COPY --from=qemustatic /usr/bin/qemu-arm-static /usr/bin/qemu-arm-static
-# TODO z currently these are three layers for faster debugging.
-#        Once the container works as expected, replace by just one.
+COPY metapackages/*.deb /opt/metapackages/
+# Here, we are using apt instead of apt-get specifically for the modern
+# possibility of installing .deb files without having to fix their dependencies
+# afterwards.
 RUN     :; \
+	set -x; \
 	printf "%s\n%s\n%s %s\n" \
 		"deb $MA_DEBIAN_MIRROR $MDVL_CI_DEBIAN_VERSION main" \
 		"deb $MA_DEBIAN_MIRROR $MDVL_CI_DEBIAN_VERSION-updates main" \
@@ -38,20 +48,9 @@ RUN     :; \
 					"$MDVL_CI_DEBIAN_VERSION/updates main" \
 		> /etc/apt/sources.list; \
 	useradd -u 1000 -m masysmaci; \
-	apt-get update; \
-	apt-get -y dist-upgrade; \
-	:
-RUN     :; \
-	apt-get -y install openssh-server reprepro \
-			ant ant-optional libxz-java openjdk-11-jdk \
-			libxml-dom-perl libgit-wrapper-perl \
-			libgit-repository-perl p7zip-full \
-			libfile-copy-recursive-perl libproc-simple-perl \
-			config-package-dev gcc g++ gnat devscripts \
-			libidn11-dev libgcrypt20-dev libgnutls28-dev \
-			libncurses-dev libxml2-dev; \
-	:
-RUN     :; \
+	apt update; \
+	apt -y full-upgrade; \
+	apt -y install /opt/metapackages/*.deb; \
 	mkdir /home/masysmaci/sshd; \
 	cp /etc/ssh/ssh_host_ed25519_key /home/masysmaci/sshd; \
 	printf "%s\n%s\n" \

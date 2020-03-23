@@ -1,5 +1,5 @@
 #!/bin/sh -e
-# Ma_Sys.ma CI 1.0, Copyright (c) 2019, 2020 Ma_Sys.ma.
+# Ma_Sys.ma CI 1.0.0, Copyright (c) 2019, 2020 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 #
 # Simple script to allow re-generation of keys which are supplied as part
@@ -8,6 +8,7 @@
 # not exposing the ssh server to external connections. Still, it would seem to
 # be good practice to use different keys everywhere and thus this script is
 # provided.
+
 for i in i386 armhf; do
 	[ -f "dot_ssh_server/id_ed25519_$i" ] || \
 		ssh-keygen -N "" -t ed25519 -f "dot_ssh_server/id_ed25519_$i"

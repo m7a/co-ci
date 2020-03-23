@@ -1,6 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project default="makepkg">
 
+<!--
+	This file provides build instructions for the required metapackages for
+	the Ma_Sys.ma CI container image. Pre-built `.deb` files are provided as
+	part of the repository such that it is normally not required to invoke
+	this script, unless everything is intended to be re-constructed from
+	source or modified versions of the metapackages are to be used.
+
+	Note that the decision for including the binary packages by default was
+	made possible by their acceptably small size (less than 10 KiB each).
+
+	Further note that if the packages were not included, it would not be
+	a simple `docker-compose build` to build all the images, because this
+	would require the package build to happen inside the container under
+	creation. While technically possible, this would require Internet access
+	for retrieving the metapackages' repositories as they are outside of
+	the build environment and volume linking is not possible for container
+	builds. As an alternative workaround, one could imagine starting a
+	webserver/"fileserver" container alongside with the container build
+	process such that the container build fetches the relevant source files
+	from the server container.
+
+	This approach would in the end fail to work with docker-compose only
+	because of the necessity to know the server container's IP address from
+	inside the build. However, requring external scripts apart from
+	docker-compose would hamper portability and increase complexity.
+-->
+
 <!-- PART OF TPL HERE FOR USE IN BUILD -->
 <property environment="env"/>
 <condition property="masysma.internal.includepath.rel" value="${env.MDVL_CI_PHOENIX_ROOT}" else="../.."><isset property="env.MDVL_CI_PHOENIX_ROOT"/></condition>

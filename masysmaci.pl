@@ -1,6 +1,8 @@
 #!/usr/bin/perl
 # Ma_Sys.ma CI 1.0.0, Copyright (c) 2019, 2020 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
+#
+# This file provides the actual CI implementation.
 
 use strict;
 use warnings FATAL => 'all';
