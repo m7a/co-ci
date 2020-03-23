@@ -283,7 +283,7 @@ sub proc_masysmaci_xml {
 			next unless $sub->getNodeType() eq ELEMENT_NODE and
 					$sub->getTagName() eq "property";
 			$conf{$sub->getAttribute("name")} =
-						$confel->getAttribute("value");
+						$sub->getAttribute("value");
 		}
 	}
 	my $incl = $doc->getElementsByTagName("include");
