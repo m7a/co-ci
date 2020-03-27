@@ -7,6 +7,7 @@
 version: "2.1"
 services:
     amd64:
+        restart: unless-stopped
         image: masysmaci:latest
         build:
             context: .
@@ -25,6 +26,7 @@ services:
         ports:
             - 127.0.0.1:9030:9030
     i386:
+        restart: unless-stopped
         image: i386/masysmaci:latest
         build:
             context: .
@@ -36,6 +38,7 @@ services:
             - ./dot_ssh_i386:/home/masysmaci/.ssh:ro
             - ../:/home/masysmaci/root
     armhf:
+        restart: unless-stopped
         image: arm32v7/masysmaci:latest
         build:
             context: .

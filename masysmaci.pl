@@ -417,7 +417,12 @@ my $thread_build = threads->create(sub {
 			} else {
 				log_info("Running $printexe, logf=$logf...");
 				my $haveln = 0;
+				# wait for log file to appear...
+				sleep 1 while(not -f $logf and $proc->poll());
 				do {
+					# do not attempt to print if no log
+					# present...
+					last if not -f $logf;
 					open my $file, '<:encoding(UTF-8)',
 									$logf;
 					my $curln = 0;
@@ -623,6 +628,33 @@ $SIG{TERM} = $SIG{INT};
 set host => $conf{address};
 set port => $conf{port};
 
+sub rest_is_true {
+	my $val = shift;
+	return (defined($val) and $val eq "1");
+}
+
+sub rest_build_repo {
+	my $repository = shift;
+	my $list = "";
+	for my $target (keys %{$trigger_runenvs{$repository}}) {
+		enqueue_to_run({repo => $repository, target => $target});
+		$list .= $target."\n";
+	}
+	return $list;
+}
+
+sub rest_build_repo_target {
+	my ($repository, $target) = @_;
+	print "[repository=$repository,target=$target]\n";
+	if(defined($trigger_runenvs{$repository}{$target})) {
+		enqueue_to_run({repo => $repository, target => $target});
+		return "$repository/$target\n";
+	} else {
+		send_error "Repository/Target combination does not exist. ".
+							"Not found.", 404;
+	}
+}
+
 get "/" => sub {
 	return "/build\n/term\n";
 };
@@ -633,29 +665,40 @@ get "/build" => sub {
 
 get "/build/:repository" => sub {
 	my $repository = route_parameters->get("repository");
-	my $runenv = $trigger_runenvs{$repository};
-	return join("", map { "/build/$repository/$_\n" } keys %{$runenv});
+	if(rest_is_true(request->header("x-masysma-post"))) {
+		return rest_build_repo $repository;
+	} else {
+		my $runenv = $trigger_runenvs{$repository};
+		return join("", map { "/build/$repository/$_\n" }
+							keys %{$runenv});
+	}
 };
 
 get "/build/:repository/:target" => sub {
-	my $runkey = route_parameters->get("repository").".".
-						route_parameters->get("target");
-	if($runkey =~ /^[a-z0-9_.-]+$/) {
-		if(defined($log_counters{$runkey})) {
-			my $logf = "$root/$logdir/$runkey".
-						".$log_counters{$runkey}.txt";
-			my $cntbuf = "";
-			open my $file, '<:encoding(UTF-8)', $logf;
-			while(my $line = <$file>) {
-				$cntbuf .= $line;
-			}
-			close $file;
-			return $cntbuf;
-		} else {
-			send_error "No build logs found.", 404;
-		}
+	my $repository = route_parameters->get("repository");
+	my $target = route_parameters->get("target");
+
+	if(rest_is_true(request->header("x-masysma-post"))) {
+		return rest_build_repo_target($repository, $target);
 	} else {
-		send_error "Misformatted input. Not found.", 404;
+		my $runkey = "$repository.$target";
+		if($runkey =~ /^[a-z0-9_.-]+$/) {
+			if(defined($log_counters{$runkey})) {
+				my $logf = "$root/$logdir/$runkey".
+						".$log_counters{$runkey}.txt";
+				my $cntbuf = "";
+				open my $file, '<:encoding(UTF-8)', $logf;
+				while(my $line = <$file>) {
+					$cntbuf .= $line;
+				}
+				close $file;
+				return $cntbuf;
+			} else {
+				send_error "No build logs found.", 404;
+			}
+		} else {
+			send_error "Misformatted input. Not found.", 404;
+		}
 	}
 };
 
@@ -663,24 +706,15 @@ post "/term" => sub {
 	$SIG{INT}->();
 };
 
-post "/build/:repository" => sub {
-	# means trigger all
-	my $repository = route_parameters->get("repository");
-	for my $target (keys %{$trigger_runenvs{$repository}}) {
-		enqueue_to_run({repo => $repository, target => $target});
-	}
+post "/build/:repository" => sub { # means trigger all
+	return rest_build_repo route_parameters->get("repository");
 };
 
 post "/build/:repository/:target" => sub {
 	# means trigger one
 	my $repository = route_parameters->get("repository");
 	my $target = route_parameters->get("target");
-	if(defined($trigger_runenvs{$repository}{$target})) {
-		enqueue_to_run({repo => $repository, target => $target});
-	} else {
-		send_error "Repository/Target combination does not exist. ".
-							"Not found.", 404;
-	}
+	return rest_build_repo_target($repository, $target);
 };
 
 start;
