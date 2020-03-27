@@ -311,12 +311,13 @@ share(%log_counters);  # also needed r/o by log printing from server
 
 mkdir "$root/$logdir" if(not -d "$root/$logdir");
 
+# TODO z support spaces in root. simple "' '" did not seem to work in a first test.
 while(<"$root/$logdir/*.txt">) {
 	# format is repository.target.number.txt
 	my @fns = split(/\./, basename($_));
 	my $key = $fns[0].".".$fns[1];
 	$log_counters{$key} = $fns[2] if(!defined($log_counters{$key}) or
-						$fns[2] gt $log_counters{$key});
+						$fns[2] > $log_counters{$key});
 }
 
 sub check_background_process_status {
@@ -413,7 +414,7 @@ my $thread_build = threads->create(sub {
 				$subprocesses{$logid} = $proc;
 				log_info("Running in background: $printexe...");
 			} else {
-				log_info("Running $printexe...");
+				log_info("Running $printexe, logf=$logf...");
 				my $haveln = 0;
 				while($proc->poll()) {
 					open my $file, '<:encoding(UTF-8)',
