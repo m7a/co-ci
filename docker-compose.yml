@@ -19,7 +19,7 @@ services:
             # write access for signing (WTF), see also:
             # http://gnupg.10057.n7.nabble.com/gnupg-on-read-only-filesystem-td53632.html
             - ${MA_GNUPG_ROOT:-./dot_gnupg_sample/}:/home/masysmaci/.gnupg
-            - ${MA_REPOSITORY_ROOT:-/var/tmp/masysmacirepo}:/data/programs/repo
+            - ${MA_REPOSITORY_ROOT:-/var/tmp/masysmacirepo}:/data/programs/repo:Z
         command:
             - /home/masysmaci/root/co-ci/masysmaci.pl
         ports:

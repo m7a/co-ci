@@ -16,6 +16,7 @@ docker run --rm -v "$subroot/keytmp:/media/keytmp" -i -u 1000 masysmaci \
 							/bin/bash -ex <<EOF
 cd /media/keytmp
 gpg --batch --gen-key genkeybatch.txt
+gpg --armor --export Linux-Fan/Test > /home/masysmaci/.gnupg/pubkey
 cp -R /home/masysmaci/.gnupg dot_gnupg
 EOF
 
@@ -26,7 +27,7 @@ fi
 mkdir "$subroot/dot_gnupg_sample"
 dot_gnupg="$subroot/keytmp/dot_gnupg"
 cp -R "$dot_gnupg"/*.d "$dot_gnupg/pubring.kbx" "$dot_gnupg/trustdb.gpg" \
-						"$subroot/dot_gnupg_sample"
+				"$dot_gnupg/pubkey" "$subroot/dot_gnupg_sample"
 rm -R "$subroot/keytmp"
 
 chown 1000:1000 -R "$subroot/dot_gnupg_sample"
