@@ -38,6 +38,7 @@ set charset      => "UTF-8";
 # Now it seems a little strange that one would need to write one's own but that
 # is it as far as I can see...
 
+$| = 1; # auto-flush STDOUT upon line ending
 binmode STDOUT, ":utf8"; # otherwise gives weird error...
 
 # $_[0] color
@@ -416,7 +417,7 @@ my $thread_build = threads->create(sub {
 			} else {
 				log_info("Running $printexe, logf=$logf...");
 				my $haveln = 0;
-				while($proc->poll()) {
+				do {
 					open my $file, '<:encoding(UTF-8)',
 									$logf;
 					my $curln = 0;
@@ -428,10 +429,10 @@ my $thread_build = threads->create(sub {
 					}
 					$haveln = $curln;
 					close $file;
-				}
+				} while($proc->poll());
 				my $rv = $proc->exit_status();
 				if($rv == 0) {
-					log_info("subprocess completed ".
+					log_info("Subprocess completed ".
 							"successfully.");
 				} else {
 					log_warning("Failed to invoke ".
@@ -440,7 +441,7 @@ my $thread_build = threads->create(sub {
 			}
 		} else {
 			log_error("Unknown query type $query->{type}.");
-		}	
+		}
 	}
 });
 
