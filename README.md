@@ -32,7 +32,7 @@ a common root directory as its input and writes logfiles to directory
 For Ma_Sys.ma purposes, Ma_Sys.ma CI serves specifically to detect changes to
 packages, build updated package files and synchronize them to a (private) Debian
 repository. The synchronization is handled by component
-_Pkgsync TODO LINK PROGRAM_.
+[masysmaci/pkgsync(32)](masysmaci_pkgsync.xhtml).
 
 Getting started: Running in Docker
 ==================================
@@ -272,8 +272,9 @@ The `newver` trigger type
 The `topleveladded` trigger type
 :   The `topleveladded` trigger runs whenever a file is added in the
     `$MDVL_CI_PHOENIX_ROOT` directory and its suffix matches the value from
-    `masysma.ci.trigger.param`. This mechanism is used by _Pkgsync_ _TODO LINK_
-    to add newly generated `.deb` files to the repository.
+    `masysma.ci.trigger.param`. This mechanism is used by
+    [masysmaci/pkgsync(32)](masysmaci_pkgsync.xhtml) to add newly generated
+    `.deb` files to the repository.
 
 REST API
 ========
