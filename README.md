@@ -6,12 +6,12 @@ date: 2020/03/28 17:56:53
 lang: en-US
 author: ["Linux-Fan, Ma_Sys.ma (Ma_Sys.ma@web.de)"]
 keywords: ["masysmaci", "ci", "perl", "mdpc2"]
-x-masysma-version: 1.0.0
+x-masysma-version: 1.0
 x-masysma-repository: https://www.github.com/m7a/co-ci
 x-masysma-website: https://masysma.lima-city.de/32/masysmaci_main.xhtml
 x-masysma-owned: 1
 x-masysma-copyright: |
-  Copyright (c) 2020 Ma_Sys.ma.
+  Copyright (c) 2019, 2020 Ma_Sys.ma.
   For further info send an e-mail to Ma_Sys.ma@web.de.
 ---
 Overview
@@ -343,3 +343,22 @@ The script to re-generate `dot_gnupg_sample` (with different keys) is provided
 in `regenerate_dot_gnupg_sample.sh`. Note that for most cases, it is recommended
 to generate the keys “manually” rather than using the script as to set a
 different user name, e-mail etc.
+
+License
+=======
+
+	Ma_Sys.ma CI 1.0, Copyright (c) 2019, 2020 Ma_Sys.ma.
+	For further info send an e-mail to Ma_Sys.ma@web.de.
+	
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+	
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+	
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <http://www.gnu.org/licenses/>.
