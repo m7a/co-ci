@@ -143,7 +143,7 @@ This advanced configuration is made of two sides:
     changes to take effect.
 
 As Docker changes are known from Docker, the following only documents the
-specifics of file `masysmaci.xml`. _TODO ASTAT_
+specifics of file `masysmaci.xml`.
 
 Here is a copy of the default configuration `masysmaci.xml`:
 
