@@ -97,7 +97,7 @@ other architectures.
 System Configuration
 ====================
 
-The Ma_Sys.ma CI can be configured to adept to your local environment by
+The Ma_Sys.ma CI can be configured to adapt to your local environment by
 multiple different means depending on what part exactly is to be configured.
 
 ## Change how the System runs through Environment Variables
