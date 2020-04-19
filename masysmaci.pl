@@ -560,6 +560,7 @@ sub check_for_changes {
 		for my $trt (keys %triggers) {
 			$triggers{$trt}->{remove}->($repo);
 		}
+		delete $known_repos{$repo};
 	}
 	@known_repos{keys %this_round} = 1;
 }
