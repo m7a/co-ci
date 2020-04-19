@@ -194,7 +194,7 @@ SSH use and trust on first connection.
 
 The individual running environments are configured by `host` elements. For any
 host, there is a `name` attribute which uniquely identifies the running
-environment in the Ma_Sys.ma CI. Attribute `phoenixroot`configures the
+environment in the Ma_Sys.ma CI. Attribute `phoenixroot` configures the
 directory where all repositories can be found in. This directory needs to
 be available in all running environments although in theory, not all running
 environments need to access all of the repositories (it is e.g. sufficient that
@@ -203,7 +203,7 @@ they can access the repositories they are trying to build packages from).
 Below the `host` element, properties are set to configure the IP address or
 host name and port of the running environment to connect to (`HostName` and
 `Port`). Additionally, the user to login with (`User`) and the location of the
-SSH private key file to use for connection needs to be given (`IdentityFile`).
+SSH private key file to use for connection need to be given (`IdentityFile`).
 If necessary, additional SSH options can be configured with additional
 `property` elements.
 
@@ -312,7 +312,7 @@ The repository contains the following structure of key material:
 	 |    |
 	 |    +-- ...
 	 |
-	 +-- dot_ssh_armfh/
+	 +-- dot_ssh_armhf/
 	 |    |
 	 |    +-- authorized_keys
 	 |
