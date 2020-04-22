@@ -24,7 +24,7 @@ of build processes.
 
 It was created out of necessity because existing systems were either very
 large (e.g. Gitlab and Jenkins), unstable (e.g. Concourse) or too difficult
-to automate properly. As an unique feature, Ma_Sys.ma CI does not require a
+to automate properly. As a unique feature, Ma_Sys.ma CI does not require a
 Git server, nor database of any kind. Instead, it takes repositories from below
 a common root directory as its input and writes logfiles to directory
 `x-co-ci-logs` as its only output.
