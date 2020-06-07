@@ -23,6 +23,11 @@ services:
             - ${MA_REPOSITORY_ROOT:-/var/tmp/masysmacirepo}:/data/programs/repo:Z
         command:
             - /home/masysmaci/root/co-ci/masysmaci.pl
+        healthcheck:
+            test: ["CMD", "/bin/sh", "-ec", "[ \"$$(ps -o cmd -Hx | grep -E 'masysmaci.pl$$' | wc -l)\" -ge 3 ]"]
+            interval: 90s
+            timeout: 20s
+            retries: 1
         ports:
             - 127.0.0.1:9030:9030
     i386:
