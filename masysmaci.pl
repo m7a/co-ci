@@ -599,7 +599,7 @@ my $thread_background_timer = threads->create(sub {
 			}
 		}
 		for(my $i = 0; $i < 5 and not $is_interrupted; $i++) {
-			sleep(1);
+			sleep(2);
 		}
 	}
 });
