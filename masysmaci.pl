@@ -67,11 +67,12 @@ sub log_error   { log_line("bold red",    "[ ERROR ] ".$_[0]); }
 # -- default/debug emtpy trigger -----------------------------------------------
 
 sub trigger_empty_add {
-	log_debug("TRIGGER + N_IMPL reponame=$_[0], target=$_[1], val=$_[2]");
+	# pass
+	return 0
 }
 
 sub trigger_empty_remove {
-	log_debug("TRIGGER - N_IMPL reponame=$_[0]");
+	# pass
 }
 
 sub trigger_empty_determine_changed {
@@ -204,6 +205,12 @@ my %triggers = (
 		add               => \&trigger_topleveladded_add,
 		remove            => \&trigger_topleveladded_remove,
 		determine_changed => \&trigger_topleveladded_determine_changed,
+	},
+	# avoid errors for missing trigger types, special type `none`
+	none => {
+		add               => \&trigger_empty_add,
+		remove            => \&trigger_empty_remove,
+		determine_changed => \&trigger_empty_determine_changed,
 	},
 	# does not seem to be needed as of now...
 	cron => {

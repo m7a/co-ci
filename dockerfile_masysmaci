@@ -7,7 +7,7 @@
 
 # docker build -t masysmaci -f dockerfile_masysmaci .
 # docker build -t i386/masysmaci -f dockerfile_masysmaci --build-arg=MDVL_CI_ARCH_PREFIX=i386/ .
-# docker build -t armhf/masysmaci -f dockerfile_masysmaci --build=arg=MDVL_CI_ARCH_PREFIX=armhf/ .
+# docker build -t armhf/masysmaci -f dockerfile_masysmaci --build-arg=MDVL_CI_ARCH_PREFIX=armhf/ .
 
 ARG MDVL_CI_ARCH_PREFIX=
 ARG MDVL_CI_DEBIAN_VERSION=buster
