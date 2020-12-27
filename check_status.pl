@@ -53,8 +53,18 @@ for my $entry (@entries) {
 		}
 	}
 	my @status_b = ($isgit, $isdoc, $isbuild, $isclean, $isonl, $isupdated);
-	my @status_w = map { $_? "\033[1;32mYES\033[0m":
-					"\033[1;31mNO=\033[0m" } @status_b;
+	my @status_imp = (1,    0,      0,        1,        1,      1);
+	my @status_w = ();
+
+	for(my $i = 0; $i <= $#status_b; $i++) {
+		if($status_b[$i]) {
+			push @status_w, "\033[1;32mYES\033[0m";
+		} elsif($status_imp[$i]) {
+			push @status_w, "\033[1;31mNO=\033[0m";
+		} else {
+			push @status_w, "\033[1;33mNO=\033[0m";
+		}
+	}
 	push @status_w, ($ntodo == 0)?  "\033[1;32m00\033[0m":
 				sprintf("\033[1;31m%02d\033[0m", $ntodo);
 	for my $s (@status_w) {
