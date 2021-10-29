@@ -10,9 +10,9 @@
 # docker build -t armhf/masysmaci -f dockerfile_masysmaci --build-arg=MDVL_CI_ARCH_PREFIX=armhf/ .
 
 ARG MDVL_CI_ARCH_PREFIX=
-ARG MDVL_CI_DEBIAN_VERSION=buster
+ARG MDVL_CI_DEBIAN_VERSION=bullseye
 FROM debian:$MDVL_CI_DEBIAN_VERSION AS qemustatic
-ARG MDVL_CI_DEBIAN_VERSION=buster
+ARG MDVL_CI_DEBIAN_VERSION=bullseye
 ARG MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
 SHELL ["/bin/sh", "-ec"]
 RUN     :; \
@@ -20,16 +20,16 @@ RUN     :; \
 		"deb $MA_DEBIAN_MIRROR $MDVL_CI_DEBIAN_VERSION main" \
 		"deb $MA_DEBIAN_MIRROR $MDVL_CI_DEBIAN_VERSION-updates main" \
 		"deb http://security.debian.org/" \
-					"$MDVL_CI_DEBIAN_VERSION/updates main" \
+				"$MDVL_CI_DEBIAN_VERSION-security main" \
 		> /etc/apt/sources.list; \
 	apt-get update; \
 	apt-get -y dist-upgrade; \
 	apt-get -y install qemu-user-static;
 
 ARG MDVL_CI_ARCH_PREFIX=
-ARG MDVL_CI_DEBIAN_VERSION=buster
+ARG MDVL_CI_DEBIAN_VERSION=bullseye
 FROM ${MDVL_CI_ARCH_PREFIX}debian:$MDVL_CI_DEBIAN_VERSION
-ARG MDVL_CI_DEBIAN_VERSION=buster
+ARG MDVL_CI_DEBIAN_VERSION=bullseye
 LABEL maintainer "Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>"
 LABEL name masysmaci
 ARG MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
@@ -45,7 +45,7 @@ RUN     :; \
 		"deb $MA_DEBIAN_MIRROR $MDVL_CI_DEBIAN_VERSION main" \
 		"deb $MA_DEBIAN_MIRROR $MDVL_CI_DEBIAN_VERSION-updates main" \
 		"deb http://security.debian.org/" \
-					"$MDVL_CI_DEBIAN_VERSION/updates main" \
+				"$MDVL_CI_DEBIAN_VERSION-security main" \
 		> /etc/apt/sources.list; \
 	useradd -u 1000 -m masysmaci; \
 	apt update; \
