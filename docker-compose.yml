@@ -1,10 +1,15 @@
-# Ma_Sys.ma CI 1.0.0, Copyright (c) 2019, 2020 Ma_Sys.ma.
+# Ma_Sys.ma CI 1.0.0, Copyright (c) 2019, 2020, 2022 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 #
 # This file defines a suggested set of containers to use for building packages
 # for multiple CPU architectures in addition to running a "main" CI instance.
 
-version: "2.1"
+# To upgrade (adjust mirror accordingly):
+#>docker-compose down
+#>docker-compose build --build-arg MA_DEBIAN_MIRROR=http://192.168.1.16/debian
+#>docker-compose up -d
+
+version: "2.2"
 services:
     amd64:
         restart: unless-stopped
