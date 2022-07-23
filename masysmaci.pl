@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Ma_Sys.ma CI 1.0.0, Copyright (c) 2019, 2020 Ma_Sys.ma.
+# Ma_Sys.ma CI 1.0.1, Copyright (c) 2019, 2020, 2022 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 #
 # This file provides the actual CI implementation.
@@ -323,9 +323,11 @@ mkdir "$root/$logdir" if(not -d "$root/$logdir");
 while(<"$root/$logdir/*.txt">) {
 	# format is repository.target.number.txt
 	my @fns = split(/\./, basename($_));
-	my $key = $fns[0].".".$fns[1];
-	$log_counters{$key} = $fns[2] if(!defined($log_counters{$key}) or
-						$fns[2] > $log_counters{$key});
+	pop @fns; # remove extension
+	my $number = pop @fns;
+	my $key = join(".", @fns);
+	$log_counters{$key} = $number if(!defined($log_counters{$key}) or
+					$number > $log_counters{$key});
 }
 
 sub check_background_process_status {
