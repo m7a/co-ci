@@ -8,7 +8,7 @@ author: ["Linux-Fan, Ma_Sys.ma (Ma_Sys.ma@web.de)"]
 keywords: ["masysmaci", "ci", "perl", "mdpc2"]
 x-masysma-version: 1.0
 x-masysma-repository: https://www.github.com/m7a/co-ci
-x-masysma-website: https://masysma.lima-city.de/32/masysmaci_main.xhtml
+x-masysma-website: https://masysma.net/32/masysmaci_main.xhtml
 x-masysma-owned: 1
 x-masysma-copyright: |
   Copyright (c) 2019, 2020 Ma_Sys.ma.
