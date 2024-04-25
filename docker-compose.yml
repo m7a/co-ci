@@ -1,4 +1,4 @@
-# Ma_Sys.ma CI 1.0.0, Copyright (c) 2019, 2020, 2022 Ma_Sys.ma.
+# Ma_Sys.ma CI 2.0.0, Copyright (c) 2019, 2020, 2022, 2023 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 #
 # This file defines a suggested set of containers to use for building packages
@@ -13,49 +13,48 @@ version: "2.2"
 services:
     amd64:
         restart: unless-stopped
-        image: masysmaci:latest
+        image: masysmaci:v2
         build:
             context: .
-            dockerfile: dockerfile_masysmaci
+            dockerfile: Dockerfile
             args:
                 - MA_DEBIAN_MIRROR=${MA_DEBIAN_MIRROR:-http://ftp.de.debian.org/debian}
         volumes:
             - ../:/home/masysmaci/root
+            - ${MA_PUBKEY:-./dot_gnupg_sample/pubkey}:/etc/apt/trusted.gpg.d/masysmacirepopubkey.asc:ro
             # As of now, it seems one cannot use :ro here, because gpg needs
             # write access for signing (WTF), see also:
             # http://gnupg.10057.n7.nabble.com/gnupg-on-read-only-filesystem-td53632.html
             - ${MA_GNUPG_ROOT:-./dot_gnupg_sample/}:/home/masysmaci/.gnupg
             - ${MA_REPOSITORY_ROOT:-/var/tmp/masysmacirepo}:/data/programs/repo:Z
         command:
-            - /home/masysmaci/root/co-ci/masysmaci.pl
-        healthcheck:
-            test: ["CMD", "/bin/sh", "-ec", "[ \"$$(ps -o cmd -Hx | grep -E 'masysmaci.pl$$' | wc -l)\" -ge 3 ]"]
-            interval: 90s
-            timeout: 20s
-            retries: 1
-        ports:
-            - 127.0.0.1:9030:9030
+            - /home/masysmaci/root/co-ci/cimain.sh
     i386:
         restart: unless-stopped
-        image: i386/masysmaci:latest
+        image: i386/masysmaci:v2
         build:
             context: .
-            dockerfile: dockerfile_masysmaci
             args:
                 - MDVL_CI_ARCH_PREFIX=i386/
                 - MA_DEBIAN_MIRROR=${MA_DEBIAN_MIRROR:-http://ftp.de.debian.org/debian}
+        # TODO z ITS BAD THAT WE CANNOT MAKE REPO READONLY BUT CURRENTLY IT IS NOT POSSIBLE TO QUERY VERSION OF PACKAGE IN REPO WHILE THE REPO IS LOCKED...
         volumes:
-            - ./dot_ssh_i386:/home/masysmaci/.ssh:ro
             - ../:/home/masysmaci/root
-    armhf:
-        restart: unless-stopped
-        image: arm32v7/masysmaci:latest
-        build:
-            context: .
-            dockerfile: dockerfile_masysmaci
-            args:
-                - MDVL_CI_ARCH_PREFIX=arm32v7/
-                - MA_DEBIAN_MIRROR=${MA_DEBIAN_MIRROR:-http://ftp.de.debian.org/debian}
-        volumes:
-            - ./dot_ssh_armhf:/home/masysmaci/.ssh:ro
-            - ../:/home/masysmaci/root
+            - ${MA_PUBKEY:-./dot_gnupg_sample/pubkey}:/etc/apt/trusted.gpg.d/masysmacirepopubkey.asc:ro
+            - ${MA_REPOSITORY_ROOT:-/var/tmp/masysmacirepo}:/data/programs/repo
+        command:
+            - /home/masysmaci/root/co-ci/cimain.sh
+    #armhf:
+    #    restart: unless-stopped
+    #    image: arm32v7/masysmaci:v2
+    #    build:
+    #        context: .
+    #        args:
+    #            - MDVL_CI_ARCH_PREFIX=arm32v7/
+    #            - MA_DEBIAN_MIRROR=${MA_DEBIAN_MIRROR:-http://ftp.de.debian.org/debian}
+    #    volumes:
+    #        - ../:/home/masysmaci/root
+    #        - ${MA_PUBKEY:-./dot_gnupg_sample/pubkey}:/etc/apt/trusted.gpg.d/masysmacirepopubkey.asc:ro
+    #        - ${MA_REPOSITORY_ROOT:-/var/tmp/masysmacirepo}:/data/programs/repo
+    #    command:
+    #        - /home/masysmaci/root/co-ci/cimain.sh

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project default="build">
+
+	<!-- CONSTANT TPL IMPORT -->
+	<property environment="env"/>
+	<condition property="masysma.internal.includepath.rel"
+			value="${env.MDVL_CI_PHOENIX_ROOT}" else="..">
+		<isset property="env.MDVL_CI_PHOENIX_ROOT"/>
+	</condition>
+	<property name="masysma.internal.includepath"
+			location="${masysma.internal.includepath.rel}"/>
+	<property name="masysma.internal.loadpath"
+			value="${masysma.internal.includepath}/co-build/ant-build-template.xml"/>
+	<condition property="masysma.internal.load"
+			value="file://${masysma.internal.loadpath}"
+			else="https://raw.githubusercontent.com/m7a/co-build/master/ant-build-template.xml">
+		<resourceexists>
+			<file file="${masysma.internal.loadpath}"/>
+		</resourceexists>
+	</condition>
+	<import><url url="${masysma.internal.load}"/></import>
+
+	<!-- ensure pkgsync properties become available -->
+	<masysma_require_repo masysmarepoid="co-pkgsync"/>
+	<import file="${masysma.internal.includepath}/co-pkgsync/build.xml"/>
+
+	<!-- meta package rebuilding -->
+	<macrodef name="updatemetapackage">
+		<attribute name="masysmarepoid"/>
+		<sequential>
+			<masysma_require_repo masysmarepoid="@{masysmarepoid}"/>
+			<delete>
+				<fileset dir="metapackages">
+					<include name="@{masysmarepoid}_*.deb"/>
+				</fileset>
+			</delete>
+			<copy todir="metapackages/@{masysmarepoid}">
+				<fileset dir="${masysma.internal.includepath}/@{masysmarepoid}"/>
+			</copy>
+			<ant dir="metapackages/@{masysmarepoid}"
+					inheritAll="false" target="package">
+				<property name="masysma.internal.includepath"
+					value="${masysma.internal.includepath}"/>
+			</ant>
+			<delete dir="metapackages/@{masysmarepoid}"/>
+		</sequential>
+	</macrodef>
+	<target name="update_meta_always">
+		<updatemetapackage masysmarepoid="lp-meta-always"/>
+	</target>
+	<target name="update_meta_minbuild">
+		<updatemetapackage masysmarepoid="lp-meta-minbuild"/>
+	</target>
+
+	<!-- auxiliary targets for convenient user invocation -->
+	<target name="update_meta"
+			depends="update_meta_always,update_meta_minbuild"/>
+	<target name="build" depends="update_meta">
+		<exec executable="docker-compose"><arg value="build"/></exec>
+	</target>
+	<target name="start">
+		<exec executable="docker-compose"><arg value="up"/>
+							<arg value="-d"/></exec>
+	</target>
+
+	<target name="runci">
+		<subant target="autoci" failonerror="true" verbose="true">
+			<fileset dir="${masysma.internal.includepath}">
+				<include name="*/build.xml"/>
+				<!--
+					It is a bit of a hack to build this file
+					list by matching the text contents of
+					the build.xml files, but it is lighter
+					on resources compared to parsing the
+					entire XML to find out whether it
+					contains an autoci target.
+				-->
+				<contains text="&lt;target name=&quot;autoci&quot; "/>
+			</fileset>
+			<!--
+				pass these to autoci build since it requires
+				them to query the data from repo
+			-->
+			<property name="mdpc.repo" value="${mdpc.repo}"/>
+			<property name="mdpc.dist" value="${mdpc.dist}"/>
+		</subant>
+	</target>
+
+</project>
