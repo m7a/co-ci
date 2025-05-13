@@ -1,4 +1,4 @@
-# Ma_Sys.ma CI 2.0.0, Copyright (c) 2019, 2020, 2023 Ma_Sys.ma.
+# Ma_Sys.ma CI 2.0.0, Copyright (c) 2019, 2020, 2023, 2025 Ma_Sys.ma.
 # For further info send an e-mail to Ma_Sys.ma@web.de.
 #
 # This file defines a container for building MDVL packages. It is prepared to
@@ -10,9 +10,9 @@
 # docker build -t armhf/masysmaci:v2 --build-arg=MDVL_CI_ARCH_PREFIX=armhf/ .
 
 ARG     MDVL_CI_ARCH_PREFIX=
-ARG     MDVL_CI_DEBIAN_VERSION=bookworm
+ARG     MDVL_CI_DEBIAN_VERSION=trixie
 FROM    debian:$MDVL_CI_DEBIAN_VERSION AS qemustatic
-ARG     MDVL_CI_DEBIAN_VERSION=bookworm
+ARG     MDVL_CI_DEBIAN_VERSION=trixie
 ARG     MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
 SHELL   ["/bin/sh", "-ec"]
 RUN     :; \
@@ -28,9 +28,9 @@ RUN     :; \
 	:
 
 ARG     MDVL_CI_ARCH_PREFIX=
-ARG     MDVL_CI_DEBIAN_VERSION=bookworm
+ARG     MDVL_CI_DEBIAN_VERSION=trixie
 FROM    ${MDVL_CI_ARCH_PREFIX}debian:$MDVL_CI_DEBIAN_VERSION
-ARG     MDVL_CI_DEBIAN_VERSION=bookworm
+ARG     MDVL_CI_DEBIAN_VERSION=trixie
 LABEL   maintainer "Linux-Fan, Ma_Sys.ma <Ma_Sys.ma@web.de>"
 LABEL   name masysmaci
 ARG     MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
