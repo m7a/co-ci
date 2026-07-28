@@ -55,6 +55,9 @@ RUN     :; \
 	apt -y install /opt/metapackages/*.deb; \
 	printf "%s\n" "deb file:///data/programs/repo squeeze main" \
 						>> /etc/apt/sources.list; \
+	mkdir -p /etc/crypto-policies/back-ends; \
+	printf "%s\n%s\n" "[asymmetric_algorithms]" "dsa3072 = 2100-01-01" \
+			> /etc/crypto-policies/back-ends/sequoia.config; \
 	:
 COPY    51-masysma-apt /etc/sudoers.d/
 RUN     chmod 600 /etc/sudoers.d/51-masysma-apt
