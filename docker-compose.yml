@@ -9,7 +9,6 @@
 #>docker-compose build --build-arg MA_DEBIAN_MIRROR=http://192.168.1.16/debian
 #>docker-compose up -d
 
-version: "2.2"
 services:
     amd64:
         restart: unless-stopped
