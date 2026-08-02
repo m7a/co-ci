@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project default="build">
 
+	<!-- external parametrization -->
+	<property name="mdpc.internal.rust" value="false"/>
+	<!--
+		It is a bit of a hack to build this file list by matching the
+		text contents of the build.xml files, but it is lighter on
+		resources compared to parsing the entire XML to find out whether
+		it contains an autoci target.
+	-->
+	<property name="mdpc.internal.matchtext"
+			value="&lt;target name=&quot;autoci&quot; "/>
+
 	<!-- CONSTANT TPL IMPORT -->
 	<property environment="env"/>
 	<condition property="masysma.internal.includepath.rel"
@@ -51,10 +62,13 @@
 	<target name="update_meta_minbuild">
 		<updatemetapackage masysmarepoid="lp-meta-minbuild"/>
 	</target>
+	<target name="update_meta_rust">
+		<updatemetapackage masysmarepoid="lp-meta-rust"/>
+	</target>
 
 	<!-- auxiliary targets for convenient user invocation -->
 	<target name="update_meta"
-			depends="update_meta_always,update_meta_minbuild"/>
+		depends="update_meta_always,update_meta_minbuild,update_meta_rust"/>
 	<target name="build" depends="update_meta">
 		<exec executable="docker-compose"><arg value="build"/></exec>
 	</target>
@@ -67,15 +81,7 @@
 		<subant target="autoci" failonerror="true" verbose="true">
 			<fileset dir="${masysma.internal.includepath}">
 				<include name="*/build.xml"/>
-				<!--
-					It is a bit of a hack to build this file
-					list by matching the text contents of
-					the build.xml files, but it is lighter
-					on resources compared to parsing the
-					entire XML to find out whether it
-					contains an autoci target.
-				-->
-				<contains text="&lt;target name=&quot;autoci&quot; "/>
+				<contains text="${mdpc.internal.matchtext}"/>
 			</fileset>
 			<!--
 				pass these to autoci build since it requires
@@ -83,6 +89,9 @@
 			-->
 			<property name="mdpc.repo" value="${mdpc.repo}"/>
 			<property name="mdpc.dist" value="${mdpc.dist}"/>
+			<!-- pass to autoci to trigger rust build if enabled -->
+			<property name="mdpc.internal.rust"
+						value="${mdpc.internal.rust}"/>
 		</subant>
 	</target>
 

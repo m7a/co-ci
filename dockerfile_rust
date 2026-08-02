@@ -1,0 +1,47 @@
+# Ma_Sys.ma CI 2.0.0 (c) 2019-2020, 2023, 2025-2026 Ma_Sys.ma <info@masysma.net>
+
+# EXEC docker build -f dockerfile_rust -t masysmaci/rust:latest --build-arg=MA_DEBIAN_MIRROR=http://192.168.128.1/debian .
+
+# Rust likes to require new compilers thus per 2026-07 need Debian testing!
+ARG     MDVL_CI_DEBIAN_VERSION=forky
+FROM    debian:$MDVL_CI_DEBIAN_VERSION
+ARG     MDVL_CI_DEBIAN_VERSION=forky
+LABEL   maintainer "Linux-Fan, Ma_Sys.ma <info@masysma.net>"
+LABEL   name masysmaci/rust
+ARG     MA_DEBIAN_MIRROR=http://deb.debian.org/debian
+SHELL   ["/bin/sh", "-ec"]
+COPY    metapackages/mdvl-meta-rust_*.deb /opt/metapackages/
+COPY    metapackages/mdvl-meta-always_*.deb /opt/metapackages/
+RUN     :; \
+	rm /etc/apt/sources.list /etc/apt/sources.list.d/* || true; \
+	printf "Types: deb\nURIs: %s\nSuites: %s\nComponents: %s\n%s\n\n" \
+		"$MA_DEBIAN_MIRROR" "$MDVL_CI_DEBIAN_VERSION" "main contrib" \
+		"Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+		> /etc/apt/sources.list.d/debian.sources; \
+	printf "Types: deb\nURIs: %s\nSuites: %s\nComponents: %s\n%s\n\n" \
+		"http://security.debian.org/debian-security/" \
+		"${MDVL_CI_DEBIAN_VERSION}-security" "main contrib" \
+		"Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+		>> /etc/apt/sources.list.d/debian.sources; \
+	printf "Types: deb\nURIs: %s\nSuites: %s\nComponents: %s\n%s\n" \
+		"$MA_DEBIAN_MIRROR" "${MDVL_CI_DEBIAN_VERSION}-updates" \
+		"main contrib" \
+		"Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+		>> /etc/apt/sources.list.d/debian.sources; \
+	apt-get update; \
+	apt-get -y full-upgrade; \
+	apt-get -y install sudo; \
+	apt -y install /opt/metapackages/*.deb; \
+	printf "Types: deb\nURIs: %s\nSuites: %s\nComponents: %s\n%s\n" \
+		"file:///data/programs/repo" "squeeze" "main" \
+		"Signed-By: /etc/apt/trusted.gpg.d/masysmacirepopubkey.asc" \
+		> /etc/apt/sources.list.d/masysma.sources; \
+	mkdir -p /etc/crypto-policies/back-ends; \
+	printf "%s\n%s\n" "[asymmetric_algorithms]" "dsa3072 = 2100-01-01" \
+			> /etc/crypto-policies/back-ends/sequoia.config; \
+	useradd -u 1000 -m masysmaci; \
+	:
+COPY    51-masysma-apt /etc/sudoers.d/
+RUN     chmod 600 /etc/sudoers.d/51-masysma-apt
+USER    masysmaci
+CMD     ["/bin/bash"]

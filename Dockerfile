@@ -36,7 +36,8 @@ LABEL   name masysmaci
 ARG     MA_DEBIAN_MIRROR=http://ftp.it.debian.org/debian
 SHELL   ["/bin/sh", "-ec"]
 COPY    --from=qemustatic /usr/bin/qemu-arm-static /usr/bin/qemu-arm-static
-COPY    metapackages/*.deb /opt/metapackages/
+COPY    metapackages/mdvl-meta-always_*.deb /opt/metapackages/
+COPY    metapackages/mdvl-meta-minbuild_*.deb /opt/metapackages/
 # Here, we are using apt instead of apt-get specifically for the modern
 # possibility of installing .deb files without having to fix their dependencies
 # afterwards.
