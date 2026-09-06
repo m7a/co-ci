@@ -57,7 +57,7 @@ services:
         command:
             - /home/masysmaci/root/co-ci/cimain.sh
             - -Dmdpc.internal.rust=true
-            - "-Dmdpc.internal.matchtext=<target name=\"autoci\" if=\"mdpc.internal.rust\" "
+            - "-Dmdpc.internal.matchtext=<target if=\"mdpc.internal.rust\" name=\"autoci\""
     #armhf:
     #    restart: unless-stopped
     #    image: arm32v7/masysmaci:v2
